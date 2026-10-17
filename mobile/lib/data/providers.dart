@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/api/api_client.dart';
@@ -19,11 +21,20 @@ final leaguesProvider = FutureProvider<Cached<List<League>>>((ref) async {
 final fixturesProvider = FutureProvider<Cached<List<Fixture>>>((ref) async {
   ref.watch(currentUserProvider.select((u) => u?.id));
   final r = await cachedGet(ref, '/api/v1/fixtures');
-  return Cached((r.data['fixtures'] as List).cast<Map<String, dynamic>>().map(Fixture.fromJson).toList(), fromCache: r.fromCache);
+  final fixtures = (r.data['fixtures'] as List).cast<Map<String, dynamic>>().map(Fixture.fromJson).toList();
+  if (!r.fromCache) {
+    // Cache every listed match's detail in the background (live first), so a match can be opened
+    // and scored offline without having been opened online. One request per match, no polling.
+    final ordered = [...fixtures]..sort((a, b) => (a.status == MatchStatus.live ? 0 : 1).compareTo(b.status == MatchStatus.live ? 0 : 1));
+    unawaited(warmCache(ref.read(apiClientProvider), ref.read(cacheBoxProvider), ordered.map((f) => matchPath(f.id))));
+  }
+  return Cached(fixtures, fromCache: r.fromCache);
 });
 
+String matchPath(String id) => '/api/v1/matches/${Uri.encodeComponent(id)}';
+
 final matchProvider = FutureProvider.family<Cached<MatchDetail>, String>((ref, id) async {
-  final r = await cachedGet(ref, '/api/v1/matches/${Uri.encodeComponent(id)}');
+  final r = await cachedGet(ref, matchPath(id));
   return Cached(MatchDetail.fromJson(r.data), fromCache: r.fromCache);
 });
 

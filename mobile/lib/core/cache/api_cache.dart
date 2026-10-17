@@ -20,6 +20,20 @@ class Cached<T> {
   final bool fromCache;
 }
 
+/// Stores the responses of [paths] in the cache, one request at a time, ignoring failures.
+/// Used to warm Match detail while Fixtures is online, so an organizer can open a match and
+/// score it after the connection drops (Section 8.4 desk check).
+Future<void> warmCache(ApiClient api, Box<String> box, Iterable<String> paths) async {
+  for (final path in paths) {
+    try {
+      final body = await api.get(path);
+      if (body is Map<String, dynamic>) await box.put(path, jsonEncode(body));
+    } on ApiException catch (e) {
+      if (e.isNetwork) return; // Offline again: stop, keep what was cached.
+    }
+  }
+}
+
 /// GET with an offline fallback: successful responses are stored in Hive, and when the server
 /// can't be reached the last stored copy is returned so Fixtures, Standings and Club open offline.
 Future<Cached<Map<String, dynamic>>> cachedGet(Ref ref, String path) async {
