@@ -372,9 +372,9 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Buy'));
     await tester.pumpAndSettle();
-    expect(find.text('Pay with mock card · PKR 4500.00'), findsOneWidget);
+    expect(find.text('Pay with mock card'), findsOneWidget);
     expect(find.text('Last one!'), findsOneWidget);
-    Navigator.of(tester.element(find.text('Pay with mock card · PKR 4500.00'))).pop();
+    Navigator.of(tester.element(find.text('Pay with mock card'))).pop();
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Back'));
     await tester.pumpAndSettle();
@@ -424,8 +424,8 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Alpha Falcons Home Jersey'));
       await tester.pumpAndSettle();
-      expect(find.text('Pay with mock card · PKR 4500.00'), findsOneWidget);
-      Navigator.of(tester.element(find.text('Pay with mock card · PKR 4500.00'))).pop();
+      expect(find.text('Pay with mock card'), findsOneWidget);
+      Navigator.of(tester.element(find.text('Pay with mock card'))).pop();
       await tester.pumpAndSettle();
       await tester.tap(find.text('Profile').last);
       await tester.pumpAndSettle();

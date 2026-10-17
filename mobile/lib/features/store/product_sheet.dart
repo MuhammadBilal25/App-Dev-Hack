@@ -13,7 +13,6 @@ import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_text_field.dart';
 import '../../core/widgets/confirm_sheet.dart';
 import '../../core/widgets/error_banner.dart';
-import '../../core/widgets/status_chip.dart';
 import '../../data/models.dart';
 import '../../data/providers.dart';
 
@@ -131,28 +130,44 @@ class _ProductSheetState extends ConsumerState<ProductSheet> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Semantics(header: true, child: Text(p.name, style: text.titleLarge)),
-                  const SizedBox(height: AppSpace.xs),
-                  Text(p.clubName.isEmpty ? p.description : '${p.clubName} · ${p.description}', style: text.bodyMedium!.copyWith(color: muted)),
-                  const SizedBox(height: AppSpace.lg),
-                  Text(v == null ? formatPrice(p.fromPriceMinor) : formatPrice(v.priceMinor), style: text.headlineSmall),
-                  const SizedBox(height: AppSpace.lg),
-                  Text('Size', style: text.titleSmall),
-                  const SizedBox(height: AppSpace.sm),
-                  Wrap(
-                    spacing: AppSpace.sm,
-                    runSpacing: AppSpace.sm,
-                    children: [for (final variant in p.variants) _SizeButton(variant: variant, selected: variant == v, onTap: () => setState(() => _selected = variant))],
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Semantics(header: true, child: Text(p.name, style: text.titleLarge)),
+                            const SizedBox(height: 2),
+                            Text('Choose a size', style: text.bodyMedium!.copyWith(color: muted)),
+                          ],
+                        ),
+                      ),
+                      Semantics(
+                        identifier: 'product_close',
+                        button: true,
+                        label: 'Close',
+                        excludeSemantics: true,
+                        child: IconButton(
+                          tooltip: 'Close',
+                          style: IconButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.surfaceContainerHigh),
+                          icon: const Icon(Icons.close, size: 20),
+                          onPressed: () => Navigator.of(context).pop(),
+                        ),
+                      ),
+                    ],
                   ),
-                  if (v != null) ...[
-                    const SizedBox(height: AppSpace.md),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: v.stock == 1
-                          ? const StatusChip(kind: StatusKind.warning, label: 'Last one!', icon: Icons.local_fire_department_outlined)
-                          : StatusChip(kind: StatusKind.success, label: '${v.stock} in stock', icon: Icons.check),
-                    ),
-                  ],
+                  const SizedBox(height: AppSpace.lg),
+                  Row(
+                    children: [
+                      for (var i = 0; i < p.variants.length; i++) ...[
+                        if (i > 0) const SizedBox(width: AppSpace.md),
+                        Expanded(
+                          child: _SizeButton(variant: p.variants[i], selected: p.variants[i] == v, onTap: () => setState(() => _selected = p.variants[i])),
+                        ),
+                      ],
+                    ],
+                  ),
                   const SizedBox(height: AppSpace.lg),
                   AppTextField(
                     id: 'product_discount',
@@ -168,13 +183,34 @@ class _ProductSheetState extends ConsumerState<ProductSheet> {
                     ErrorBanner(id: 'checkout_error', message: _error!),
                   ],
                   const SizedBox(height: AppSpace.xl),
-                  AppButton(
-                    id: 'product_pay',
-                    variant: AppButtonVariant.cta,
-                    loading: _paying,
-                    label: v == null ? 'Sold out · pick another product' : 'Pay with mock card · ${formatPrice(v.priceMinor)}',
-                    icon: Icons.credit_card,
-                    onPressed: v == null ? null : _pay,
+                  Semantics(
+                    identifier: 'product_pay',
+                    button: true,
+                    enabled: v != null && !_paying,
+                    label: v == null ? 'Sold out' : 'Pay with mock card · ${formatPrice(v.priceMinor)}',
+                    excludeSemantics: true,
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        onPressed: v == null || _paying ? null : _pay,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Theme.of(context).colorScheme.tertiary,
+                          foregroundColor: Theme.of(context).colorScheme.onTertiary,
+                          disabledBackgroundColor: _paying ? Theme.of(context).colorScheme.tertiary : null,
+                          padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
+                        ),
+                        child: _paying
+                            ? SizedBox.square(dimension: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: Theme.of(context).colorScheme.onTertiary))
+                            : v == null
+                                ? const Text('Sold out · pick another product')
+                                : Row(
+                                    children: [
+                                      const Expanded(child: Text('Pay with mock card', maxLines: 1, overflow: TextOverflow.ellipsis)),
+                                      Text(formatPrice(v.priceMinor)),
+                                    ],
+                                  ),
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -212,7 +248,7 @@ class _SizeButton extends StatelessWidget {
         child: AnimatedContainer(
           duration: AppMotion.of(context, AppMotion.fast),
           curve: AppMotion.fastCurve,
-          constraints: const BoxConstraints(minWidth: 72, minHeight: 56),
+          constraints: const BoxConstraints(minWidth: 72, minHeight: 60),
           padding: const EdgeInsets.symmetric(horizontal: AppSpace.md, vertical: AppSpace.sm),
           decoration: BoxDecoration(
             color: soldOut ? scheme.surfaceContainerHigh : selected ? scheme.primaryContainer : scheme.surfaceContainerLowest,
@@ -223,13 +259,21 @@ class _SizeButton extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                variant.size,
+                selected ? '${variant.size} ✓' : variant.size,
                 style: text.titleMedium!.copyWith(
                   color: soldOut ? scheme.onSurfaceVariant : selected ? scheme.onPrimaryContainer : scheme.onSurface,
                   decoration: soldOut ? TextDecoration.lineThrough : null,
                 ),
               ),
-              Text(stockText, style: text.labelSmall!.copyWith(color: scheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 2),
+              if (variant.stock == 1)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                  decoration: BoxDecoration(color: context.status.warning.bg, borderRadius: BorderRadius.circular(AppRadius.sm)),
+                  child: Text('Last one!', style: text.labelSmall!.copyWith(color: context.status.warning.fg)),
+                )
+              else
+                Text(soldOut ? stockText : '${variant.stock} in stock', style: text.labelSmall!.copyWith(color: scheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
             ],
           ),
         ),
