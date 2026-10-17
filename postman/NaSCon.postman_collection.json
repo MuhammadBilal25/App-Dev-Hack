@@ -10,6 +10,21 @@
       "value": "http://localhost:8080"
     }
   ],
+  "event": [
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const m = pm.info.requestName.match(/->\\s*(\\d{3})(?:\\s+([A-Z_]{3,}))?/);",
+          "if (m) {",
+          "  pm.test(`status is ${m[1]}`, () => pm.response.to.have.status(Number(m[1])));",
+          "  if (m[2]) pm.test(`error code is ${m[2]}`, () => pm.expect(pm.response.json().error.code).to.eql(m[2]));",
+          "}"
+        ]
+      }
+    }
+  ],
   "item": [
     {
       "name": "1. Setup",
@@ -661,6 +676,692 @@
                 "v1",
                 "score",
                 "b1"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "4b. Fixture generation",
+      "item": [
+        {
+          "name": "Round robin 5 teams + withdrawal -> 200 (8 scheduled, 2 forfeit)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/fixtures",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "fixtures"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"format\": \"round_robin\",\n  \"teams\": [\n    \"t1\",\n    \"t2\",\n    \"t3\",\n    \"t4\",\n    \"t5\"\n  ],\n  \"params\": {\n    \"legs\": 1,\n    \"withdrawals\": [\n      {\n        \"team_id\": \"t3\",\n        \"after_round\": 2\n      }\n    ],\n    \"withdrawal_policy\": \"forfeit_remaining\"\n  }\n}"
+            },
+            "description": "Each round has one bye. Check summary."
+          }
+        },
+        {
+          "name": "Double round robin 4 teams -> 200 (6 rounds)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/fixtures",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "fixtures"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"format\": \"round_robin\",\n  \"teams\": [\n    \"t1\",\n    \"t2\",\n    \"t3\",\n    \"t4\"\n  ],\n  \"params\": {\n    \"legs\": 2\n  }\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Round robin 1 team -> 400 VALIDATION_ERROR",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/fixtures",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "fixtures"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"format\": \"round_robin\",\n  \"teams\": [\n    \"t1\"\n  ]\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Swiss round 1, 7 teams -> 200 (t1-t4, t2-t5, t3-t6, bye t7)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/fixtures",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "fixtures"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"format\": \"swiss\",\n  \"teams\": [\n    \"t1\",\n    \"t2\",\n    \"t3\",\n    \"t4\",\n    \"t5\",\n    \"t6\",\n    \"t7\"\n  ],\n  \"params\": {\n    \"total_rounds\": 3,\n    \"round\": 1\n  }\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Swiss spec example round 2 -> 200 (bye t3)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/fixtures",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "fixtures"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"format\": \"swiss\",\n  \"teams\": [\n    \"t1\",\n    \"t2\",\n    \"t3\",\n    \"t4\",\n    \"t5\"\n  ],\n  \"params\": {\n    \"total_rounds\": 3,\n    \"round\": 2,\n    \"history\": [\n      {\n        \"round\": 1,\n        \"bye\": \"t5\",\n        \"matches\": [\n          {\n            \"home\": \"t1\",\n            \"away\": \"t3\",\n            \"result\": \"home\"\n          },\n          {\n            \"home\": \"t2\",\n            \"away\": \"t4\",\n            \"result\": \"draw\"\n          }\n        ]\n      }\n    ]\n  }\n}"
+            },
+            "description": "Standings: t1 1.0, t5 1.0, t2 0.5 (buchholz 0.5)"
+          }
+        },
+        {
+          "name": "Swiss impossible pairing -> 409 NO_VALID_PAIRING",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/fixtures",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "fixtures"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"format\": \"swiss\",\n  \"teams\": [\n    \"t1\",\n    \"t2\",\n    \"t3\",\n    \"t4\",\n    \"t5\",\n    \"t6\"\n  ],\n  \"params\": {\n    \"total_rounds\": 5,\n    \"round\": 4,\n    \"history\": [\n      {\n        \"round\": 1,\n        \"bye\": null,\n        \"matches\": [\n          {\n            \"home\": \"t1\",\n            \"away\": \"t4\",\n            \"result\": \"draw\"\n          },\n          {\n            \"home\": \"t2\",\n            \"away\": \"t5\",\n            \"result\": \"draw\"\n          },\n          {\n            \"home\": \"t3\",\n            \"away\": \"t6\",\n            \"result\": \"draw\"\n          }\n        ]\n      },\n      {\n        \"round\": 2,\n        \"bye\": null,\n        \"matches\": [\n          {\n            \"home\": \"t1\",\n            \"away\": \"t5\",\n            \"result\": \"draw\"\n          },\n          {\n            \"home\": \"t2\",\n            \"away\": \"t6\",\n            \"result\": \"draw\"\n          },\n          {\n            \"home\": \"t3\",\n            \"away\": \"t4\",\n            \"result\": \"draw\"\n          }\n        ]\n      },\n      {\n        \"round\": 3,\n        \"bye\": null,\n        \"matches\": [\n          {\n            \"home\": \"t1\",\n            \"away\": \"t6\",\n            \"result\": \"draw\"\n          },\n          {\n            \"home\": \"t2\",\n            \"away\": \"t4\",\n            \"result\": \"draw\"\n          },\n          {\n            \"home\": \"t3\",\n            \"away\": \"t5\",\n            \"result\": \"draw\"\n          }\n        ]\n      }\n    ]\n  }\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Single elim 6 teams + result -> 200 (byes for seeds 1 and 2)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/fixtures",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "fixtures"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"format\": \"single_elim\",\n  \"teams\": [\n    \"t1\",\n    \"t2\",\n    \"t3\",\n    \"t4\",\n    \"t5\",\n    \"t6\"\n  ],\n  \"params\": {\n    \"third_place_match\": true,\n    \"results\": [\n      {\n        \"match_id\": \"R1M2\",\n        \"winner\": \"t4\"\n      }\n    ]\n  }\n}"
+            },
+            "description": "R2M1 should be t1 vs t4"
+          }
+        },
+        {
+          "name": "Single elim bad winner -> 400 VALIDATION_ERROR",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/fixtures",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "fixtures"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"format\": \"single_elim\",\n  \"teams\": [\n    \"t1\",\n    \"t2\",\n    \"t3\",\n    \"t4\"\n  ],\n  \"params\": {\n    \"results\": [\n      {\n        \"match_id\": \"R1M1\",\n        \"winner\": \"t3\"\n      }\n    ]\n  }\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Double elim 8 teams with reset -> 200 (6 losers matches, GF1+GF2)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/fixtures",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "fixtures"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"format\": \"double_elim\",\n  \"teams\": [\n    \"t1\",\n    \"t2\",\n    \"t3\",\n    \"t4\",\n    \"t5\",\n    \"t6\",\n    \"t7\",\n    \"t8\"\n  ],\n  \"params\": {\n    \"bracket_reset\": true,\n    \"results\": [\n      {\n        \"match_id\": \"WR1M1\",\n        \"winner\": \"t1\"\n      }\n    ]\n  }\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Unknown format -> 400 VALIDATION_ERROR",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/fixtures",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "fixtures"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"format\": \"knockout\",\n  \"teams\": [\n    \"t1\",\n    \"t2\"\n  ]\n}"
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "4c. Standings",
+      "item": [
+        {
+          "name": "Reset -> 200",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/reset",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "reset"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Register 3-team league -> 201",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/leagues",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "leagues"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"league_id\": \"lg-st\",\n  \"sport_id\": \"football\",\n  \"teams\": [\n    \"A\",\n    \"B\",\n    \"C\"\n  ],\n  \"fixtures\": [\n    {\n      \"match_id\": \"s1\",\n      \"home\": \"A\",\n      \"away\": \"B\"\n    },\n    {\n      \"match_id\": \"s2\",\n      \"home\": \"B\",\n      \"away\": \"C\"\n    },\n    {\n      \"match_id\": \"s3\",\n      \"home\": \"C\",\n      \"away\": \"A\"\n    }\n  ],\n  \"qualification\": {\n    \"spots\": 1\n  },\n  \"lots_seed\": 42\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "s1: start -> 201",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/events",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "events"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event_id\": \"s1-start\",\n  \"match_id\": \"s1\",\n  \"type\": \"match_start\",\n  \"payload\": {}\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "s1: goal A -> 201",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/events",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "events"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event_id\": \"sg-a1\",\n  \"match_id\": \"s1\",\n  \"type\": \"score\",\n  \"payload\": {\n    \"team_id\": \"A\",\n    \"event_type\": \"goal\"\n  }\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "s1: end -> 201",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/events",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "events"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event_id\": \"s1-end\",\n  \"match_id\": \"s1\",\n  \"type\": \"match_end\",\n  \"payload\": {}\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "s2: start -> 201",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/events",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "events"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event_id\": \"s2-start\",\n  \"match_id\": \"s2\",\n  \"type\": \"match_start\",\n  \"payload\": {}\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "s2: goal B -> 201",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/events",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "events"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event_id\": \"s2-goal\",\n  \"match_id\": \"s2\",\n  \"type\": \"score\",\n  \"payload\": {\n    \"team_id\": \"B\",\n    \"event_type\": \"goal\"\n  }\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "s2: end -> 201",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/events",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "events"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event_id\": \"s2-end\",\n  \"match_id\": \"s2\",\n  \"type\": \"match_end\",\n  \"payload\": {}\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "s3: start -> 201",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/events",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "events"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event_id\": \"s3-start\",\n  \"match_id\": \"s3\",\n  \"type\": \"match_start\",\n  \"payload\": {}\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "s3: goal C -> 201",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/events",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "events"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event_id\": \"s3-goal\",\n  \"match_id\": \"s3\",\n  \"type\": \"score\",\n  \"payload\": {\n    \"team_id\": \"C\",\n    \"event_type\": \"goal\"\n  }\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "s3: end -> 201",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/events",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "events"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event_id\": \"s3-end\",\n  \"match_id\": \"s3\",\n  \"type\": \"match_end\",\n  \"payload\": {}\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Standings: 3-way tie on 3 pts -> 200 (resolved_by draw_lots)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/standings/lg-st",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "standings",
+                "lg-st"
+              ]
+            },
+            "description": "All on 3 points, H2H and diff equal, so the seeded draw of lots decides."
+          }
+        },
+        {
+          "name": "Disallow A goal in s1 (compensation) -> 201",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/events",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "events"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event_id\": \"sg-comp\",\n  \"match_id\": \"s1\",\n  \"type\": \"compensation\",\n  \"payload\": {\n    \"compensates\": \"sg-a1\",\n    \"reason\": \"VAR offside\"\n  }\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Standings recomputed -> 200 (B 4, C 3, A 1)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/standings/lg-st",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "standings",
+                "lg-st"
+              ]
+            },
+            "description": "s1 is now 0-0: B first with 4 points."
+          }
+        },
+        {
+          "name": "Standings unknown league -> 404 LEAGUE_NOT_FOUND",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/standings/nope",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "standings",
+                "nope"
               ]
             },
             "description": ""
