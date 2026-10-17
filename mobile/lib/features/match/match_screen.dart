@@ -8,9 +8,9 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 
 import '../../core/auth/auth_controller.dart';
-import '../../core/brand/club_crest.dart';
 import '../../core/layout/page_body.dart';
 import '../../core/settings/settings.dart';
+import '../../core/theme/tenant.dart';
 import '../../core/sync/submit.dart';
 import '../../core/widgets/confirm_sheet.dart';
 import '../../core/theme/status_colors.dart';
@@ -157,11 +157,12 @@ class _Hero extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final scheme = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
-    final on = scheme.onPrimary;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final on = dark ? scheme.onSurface : scheme.onPrimary;
     final user = ref.watch(currentUserProvider);
     final f = detail?.fixture;
     return Material(
-      color: scheme.primary,
+      color: dark ? scheme.primaryContainer : scheme.primary,
       child: SafeArea(
         bottom: false,
         child: Padding(
@@ -225,13 +226,23 @@ class _HeroTeam extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final on = Theme.of(context).colorScheme.onPrimary;
+    final scheme = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final on = dark ? scheme.onSurface : scheme.onPrimary;
     return Column(
       children: [
-        Container(
-          padding: const EdgeInsets.all(AppSpace.xs),
-          decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerLowest, borderRadius: BorderRadius.circular(AppRadius.md)),
-          child: ClubCrest(name: team.name, size: 44),
+        ExcludeSemantics(
+          child: Container(
+            width: 44,
+            height: 44,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(color: dark ? scheme.surfaceContainerHigh : scheme.surfaceContainerLowest, shape: BoxShape.circle),
+            child: Text(
+              initialsOf(team.name),
+              textScaler: TextScaler.noScaling,
+              style: TextStyle(fontFamily: AppFonts.display, fontWeight: FontWeight.w700, fontSize: 12, color: dark ? scheme.onPrimaryContainer : scheme.primary),
+            ),
+          ),
         ),
         const SizedBox(height: AppSpace.sm),
         Text(
@@ -254,7 +265,8 @@ class _HeroScore extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final f = fixture;
-    final on = Theme.of(context).colorScheme.onPrimary;
+    final scheme = Theme.of(context).colorScheme;
+    final on = Theme.of(context).brightness == Brightness.dark ? scheme.onSurface : scheme.onPrimary;
     final style = Theme.of(context).textTheme.displayMedium!.copyWith(color: on);
     final score = f.hasScore ? '${f.home.display} : ${f.away.display}' : DateFormat.Hm().format(f.kickoff);
     return Padding(
@@ -300,7 +312,12 @@ class _OnBrandChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: AppSpace.sm, vertical: 3),
       decoration: BoxDecoration(color: scheme.onPrimary.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(AppRadius.sm)),
-      child: Text(label, style: Theme.of(context).textTheme.labelSmall!.copyWith(color: scheme.onPrimary)),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelSmall!.copyWith(
+              color: Theme.of(context).brightness == Brightness.dark ? scheme.onSurface : scheme.onPrimary,
+            ),
+      ),
     );
   }
 }
@@ -313,21 +330,36 @@ class _Tabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      identifier: 'match_tabs',
-      child: SizedBox(
-        width: double.infinity,
-        child: SegmentedButton<int>(
-          segments: const [
-            ButtonSegment(value: 0, label: Text('Timeline'), icon: Icon(Icons.timeline)),
-            ButtonSegment(value: 1, label: Text('Line-ups'), icon: Icon(Icons.groups_outlined)),
-          ],
-          selected: {index},
-          showSelectedIcon: false,
-          onSelectionChanged: (s) => onChanged(s.first),
-        ),
-      ),
-    );
+    final scheme = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+    Widget tab(int i, String label) => Expanded(
+          child: Semantics(
+            identifier: 'match_tab_${i == 0 ? 'timeline' : 'lineups'}',
+            button: true,
+            selected: i == index,
+            excludeSemantics: true,
+            label: label,
+            child: InkWell(
+              onTap: () => onChanged(i),
+              child: AnimatedContainer(
+                duration: AppMotion.of(context, AppMotion.fast),
+                height: AppSize.touch,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  border: Border(bottom: BorderSide(color: i == index ? scheme.primary : scheme.outlineVariant, width: i == index ? 2.5 : 1)),
+                ),
+                child: Text(
+                  label,
+                  style: text.bodyLarge!.copyWith(
+                    color: i == index ? scheme.primary : scheme.onSurfaceVariant,
+                    fontWeight: i == index ? FontWeight.w800 : FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+    return Row(children: [tab(0, 'Timeline'), tab(1, 'Line-ups')]);
   }
 }
 
