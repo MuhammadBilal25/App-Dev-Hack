@@ -10,6 +10,8 @@ const scoring = require('./services/scoring');
 const leagues = require('./services/leagues');
 const realtime = require('./realtime');
 const store = require('./services/store');
+const roster = require('./services/roster');
+const offlineSync = require('./services/offlineSync');
 const auth = require('./services/auth');
 const { guard, authorized } = require('./services/rbac');
 const { rateLimit } = require('./middleware/rateLimit');
@@ -38,6 +40,11 @@ function createApp() {
   app.post('/audit/v1/leagues', (req, res) => send(res, leagues.registerLeague(req.body)));
   app.post('/audit/v1/events', (req, res) => send(res, scoring.appendEvent(req.body)));
   app.get('/audit/v1/score/:matchId', (req, res) => res.status(200).json(scoring.getScore(req.params.matchId)));
+
+  app.post('/audit/v1/roster/setup', (req, res) => send(res, roster.setup(req.body)));
+  app.post('/audit/v1/roster/transfer', (req, res) => send(res, roster.transfer(req.body)));
+  app.get('/audit/v1/roster/history/:playerId', (req, res) => res.status(200).json(roster.history(req.params.playerId, req.query.as_of)));
+  app.post('/audit/v1/offline-sync', (req, res) => send(res, offlineSync.sync(req.body)));
 
   app.post('/audit/v1/checkout', async (req, res) => send(res, await store.checkout(req.body)));
   app.get('/audit/v1/inventory/:variantId', async (req, res) => res.status(200).json(await store.inventory(req.params.variantId)));

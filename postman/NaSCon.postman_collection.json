@@ -1287,6 +1287,401 @@
           }
         }
       ]
+    },
+    {
+      "name": "7. Roster + transfers",
+      "item": [
+        {
+          "name": "Reset -> 200",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/reset",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "reset"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Setup roster scenario -> 201",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/roster/setup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "roster",
+                "setup"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"league\": {\n    \"league_id\": \"lg-r1\",\n    \"tenant_id\": \"tenant-alpha\",\n    \"sport_id\": \"football\",\n    \"transfer_window\": {\n      \"open\": \"2026-09-01\",\n      \"close\": \"2026-09-30\"\n    },\n    \"max_squad_size\": 4,\n    \"required_positions\": {\n      \"gk\": 1\n    }\n  },\n  \"squads\": [\n    {\n      \"squad_id\": \"sq-a\",\n      \"club_id\": \"club-a\",\n      \"tenant_id\": \"tenant-alpha\",\n      \"name\": \"A\"\n    },\n    {\n      \"squad_id\": \"sq-b\",\n      \"club_id\": \"club-b\",\n      \"tenant_id\": \"tenant-alpha\",\n      \"name\": \"B\"\n    }\n  ],\n  \"players\": [\n    {\n      \"player_id\": \"p1\",\n      \"name\": \"Ali\",\n      \"position\": \"gk\",\n      \"squad_id\": \"sq-a\",\n      \"role\": \"captain\"\n    },\n    {\n      \"player_id\": \"p2\",\n      \"name\": \"Bilal\",\n      \"position\": \"df\",\n      \"squad_id\": \"sq-a\",\n      \"role\": \"starter\"\n    },\n    {\n      \"player_id\": \"p3\",\n      \"name\": \"Danish\",\n      \"position\": \"fw\",\n      \"squad_id\": \"sq-b\",\n      \"role\": \"starter\"\n    }\n  ],\n  \"matches_in_progress\": [\n    {\n      \"match_id\": \"m-live\",\n      \"home_squad_id\": \"sq-a\",\n      \"away_squad_id\": \"sq-b\"\n    }\n  ]\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Transfer outside window -> 409 TRANSFER_WINDOW_CLOSED",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/roster/transfer",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "roster",
+                "transfer"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"request_id\": \"tr-001\",\n  \"league_id\": \"lg-r1\",\n  \"player_id\": \"p2\",\n  \"type\": \"transfer\",\n  \"from_squad_id\": \"sq-a\",\n  \"to_squad_id\": \"sq-b\",\n  \"effective_date\": \"2026-10-05\",\n  \"loan_end_date\": null,\n  \"reason\": \"Tactical move\",\n  \"requested_by\": \"user-77\"\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Transfer only GK -> 409 MIN_POSITION_VIOLATION",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/roster/transfer",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "roster",
+                "transfer"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"request_id\": \"tr-002\",\n  \"league_id\": \"lg-r1\",\n  \"player_id\": \"p1\",\n  \"type\": \"transfer\",\n  \"from_squad_id\": \"sq-a\",\n  \"to_squad_id\": \"sq-b\",\n  \"effective_date\": \"2026-09-15\",\n  \"loan_end_date\": null,\n  \"reason\": \"Tactical move\",\n  \"requested_by\": \"user-77\"\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Transfer p2 on last window day -> 201 deferred (live match)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/roster/transfer",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "roster",
+                "transfer"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"request_id\": \"tr-003\",\n  \"league_id\": \"lg-r1\",\n  \"player_id\": \"p2\",\n  \"type\": \"transfer\",\n  \"from_squad_id\": \"sq-a\",\n  \"to_squad_id\": \"sq-b\",\n  \"effective_date\": \"2026-09-30\",\n  \"loan_end_date\": null,\n  \"reason\": \"Tactical move\",\n  \"requested_by\": \"user-77\"\n}"
+            },
+            "description": "Send again -> 200 replay"
+          }
+        },
+        {
+          "name": "Loan p3 to sq-a -> 201",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/roster/transfer",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "roster",
+                "transfer"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"request_id\": \"tr-004\",\n  \"league_id\": \"lg-r1\",\n  \"player_id\": \"p3\",\n  \"type\": \"loan\",\n  \"from_squad_id\": \"sq-b\",\n  \"to_squad_id\": \"sq-a\",\n  \"effective_date\": \"2026-09-10\",\n  \"loan_end_date\": \"2026-12-31\",\n  \"reason\": \"Tactical move\",\n  \"requested_by\": \"user-77\"\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Release loaned p3 -> 409 PLAYER_ON_LOAN",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/roster/transfer",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "roster",
+                "transfer"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"request_id\": \"tr-005\",\n  \"league_id\": \"lg-r1\",\n  \"player_id\": \"p3\",\n  \"type\": \"release\",\n  \"from_squad_id\": \"sq-a\",\n  \"to_squad_id\": null,\n  \"effective_date\": \"2026-09-15\",\n  \"loan_end_date\": null,\n  \"reason\": \"Tactical move\",\n  \"requested_by\": \"user-77\"\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "History p3 during loan -> current sq-a",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/roster/history/p3?as_of=2026-11-01",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "roster",
+                "history",
+                "p3?as_of=2026-11-01"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "History p3 after loan -> back to sq-b + loan_return",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/roster/history/p3?as_of=2027-01-05",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "roster",
+                "history",
+                "p3?as_of=2027-01-05"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Offline sync",
+      "item": [
+        {
+          "name": "Reset -> 200",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/reset",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "reset"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Setup roster scenario -> 201",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/roster/setup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "roster",
+                "setup"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"league\": {\n    \"league_id\": \"lg-r1\",\n    \"tenant_id\": \"tenant-alpha\",\n    \"sport_id\": \"football\",\n    \"transfer_window\": {\n      \"open\": \"2026-09-01\",\n      \"close\": \"2026-09-30\"\n    },\n    \"max_squad_size\": 4,\n    \"required_positions\": {\n      \"gk\": 1\n    }\n  },\n  \"squads\": [\n    {\n      \"squad_id\": \"sq-a\",\n      \"club_id\": \"club-a\",\n      \"tenant_id\": \"tenant-alpha\",\n      \"name\": \"A\"\n    },\n    {\n      \"squad_id\": \"sq-b\",\n      \"club_id\": \"club-b\",\n      \"tenant_id\": \"tenant-alpha\",\n      \"name\": \"B\"\n    }\n  ],\n  \"players\": [\n    {\n      \"player_id\": \"p1\",\n      \"name\": \"Ali\",\n      \"position\": \"gk\",\n      \"squad_id\": \"sq-a\",\n      \"role\": \"captain\"\n    },\n    {\n      \"player_id\": \"p2\",\n      \"name\": \"Bilal\",\n      \"position\": \"df\",\n      \"squad_id\": \"sq-a\",\n      \"role\": \"starter\"\n    },\n    {\n      \"player_id\": \"p3\",\n      \"name\": \"Danish\",\n      \"position\": \"fw\",\n      \"squad_id\": \"sq-b\",\n      \"role\": \"starter\"\n    }\n  ],\n  \"matches_in_progress\": [\n    {\n      \"match_id\": \"m-live\",\n      \"home_squad_id\": \"sq-a\",\n      \"away_squad_id\": \"sq-b\"\n    }\n  ]\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Init match m1 -> 201",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/events",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "events"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event_id\": \"i1\",\n  \"match_id\": \"m1\",\n  \"type\": \"match_init\",\n  \"payload\": {\n    \"sport_id\": \"football\",\n    \"home_team_id\": \"t1\",\n    \"away_team_id\": \"t2\"\n  }\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Start m1 -> 201",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/events",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "events"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event_id\": \"s1\",\n  \"match_id\": \"m1\",\n  \"type\": \"match_start\",\n  \"payload\": {}\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Sync queued actions -> 200 (applied + rejected)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/offline-sync",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "offline-sync"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"device_id\": \"dev-1\",\n  \"actions\": [\n    {\n      \"action_id\": \"a1\",\n      \"type\": \"score_event\",\n      \"queued_at\": \"2026-10-17T11:00:00Z\",\n      \"base_version\": 2,\n      \"payload\": {\n        \"event_id\": \"evt-9\",\n        \"match_id\": \"m1\",\n        \"type\": \"score\",\n        \"payload\": {\n          \"team_id\": \"t1\",\n          \"event_type\": \"goal\"\n        }\n      }\n    },\n    {\n      \"action_id\": \"a2\",\n      \"type\": \"roster_transfer\",\n      \"queued_at\": \"2026-10-17T11:01:00Z\",\n      \"base_version\": 0,\n      \"payload\": {\n        \"request_id\": \"rq-1\",\n        \"league_id\": \"lg-r1\",\n        \"player_id\": \"p2\",\n        \"type\": \"transfer\",\n        \"from_squad_id\": \"sq-a\",\n        \"to_squad_id\": \"sq-b\",\n        \"effective_date\": \"2026-09-15\",\n        \"loan_end_date\": null,\n        \"reason\": \"Tactical move\",\n        \"requested_by\": \"user-77\"\n      }\n    },\n    {\n      \"action_id\": \"a3\",\n      \"type\": \"roster_transfer\",\n      \"queued_at\": \"2026-10-17T11:02:00Z\",\n      \"base_version\": 0,\n      \"payload\": {\n        \"request_id\": \"rq-2\",\n        \"league_id\": \"lg-r1\",\n        \"player_id\": \"p1\",\n        \"type\": \"transfer\",\n        \"from_squad_id\": \"sq-a\",\n        \"to_squad_id\": \"sq-b\",\n        \"effective_date\": \"2026-09-15\",\n        \"loan_end_date\": null,\n        \"reason\": \"Tactical move\",\n        \"requested_by\": \"user-77\"\n      }\n    }\n  ]\n}"
+            },
+            "description": "Send again -> every action is duplicate"
+          }
+        }
+      ]
     }
   ]
 }

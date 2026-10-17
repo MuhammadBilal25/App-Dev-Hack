@@ -119,8 +119,57 @@ const collection = {
         req('Ping (rate limited 100/10s) -> 200', 'GET', '/api/v1/ping', null, 'Use the Runner with 150 iterations to see 429 RATE_LIMITED'),
       ],
     },
+    {
+      name: '7. Roster + transfers',
+      item: [
+        req('Reset -> 200', 'POST', '/audit/v1/reset', {}),
+        req('Setup roster scenario -> 201', 'POST', '/audit/v1/roster/setup', rosterSetup()),
+        req('Transfer outside window -> 409 TRANSFER_WINDOW_CLOSED', 'POST', '/audit/v1/roster/transfer', transferBody('tr-001', { effective_date: '2026-10-05' })),
+        req('Transfer only GK -> 409 MIN_POSITION_VIOLATION', 'POST', '/audit/v1/roster/transfer', transferBody('tr-002', { player_id: 'p1' })),
+        req('Transfer p2 on last window day -> 201 deferred (live match)', 'POST', '/audit/v1/roster/transfer', transferBody('tr-003', { effective_date: '2026-09-30' }), 'Send again -> 200 replay'),
+        req('Loan p3 to sq-a -> 201', 'POST', '/audit/v1/roster/transfer', transferBody('tr-004', { player_id: 'p3', type: 'loan', from_squad_id: 'sq-b', to_squad_id: 'sq-a', effective_date: '2026-09-10', loan_end_date: '2026-12-31' })),
+        req('Release loaned p3 -> 409 PLAYER_ON_LOAN', 'POST', '/audit/v1/roster/transfer', transferBody('tr-005', { player_id: 'p3', type: 'release', from_squad_id: 'sq-a', to_squad_id: null })),
+        req('History p3 during loan -> current sq-a', 'GET', '/audit/v1/roster/history/p3?as_of=2026-11-01'),
+        req('History p3 after loan -> back to sq-b + loan_return', 'GET', '/audit/v1/roster/history/p3?as_of=2027-01-05'),
+      ],
+    },
+    {
+      name: '8. Offline sync',
+      item: [
+        req('Reset -> 200', 'POST', '/audit/v1/reset', {}),
+        req('Setup roster scenario -> 201', 'POST', '/audit/v1/roster/setup', rosterSetup()),
+        req('Init match m1 -> 201', 'POST', '/audit/v1/events', { event_id: 'i1', match_id: 'm1', type: 'match_init', payload: { sport_id: 'football', home_team_id: 't1', away_team_id: 't2' } }),
+        req('Start m1 -> 201', 'POST', '/audit/v1/events', { event_id: 's1', match_id: 'm1', type: 'match_start', payload: {} }),
+        req('Sync queued actions -> 200 (applied + rejected)', 'POST', '/audit/v1/offline-sync', {
+          device_id: 'dev-1',
+          actions: [
+            { action_id: 'a1', type: 'score_event', queued_at: '2026-10-17T11:00:00Z', base_version: 2, payload: { event_id: 'evt-9', match_id: 'm1', type: 'score', payload: { team_id: 't1', event_type: 'goal' } } },
+            { action_id: 'a2', type: 'roster_transfer', queued_at: '2026-10-17T11:01:00Z', base_version: 0, payload: transferBody('rq-1', { effective_date: '2026-09-15' }) },
+            { action_id: 'a3', type: 'roster_transfer', queued_at: '2026-10-17T11:02:00Z', base_version: 0, payload: transferBody('rq-2', { player_id: 'p1', effective_date: '2026-09-15' }) },
+          ],
+        }, 'Send again -> every action is duplicate'),
+      ],
+    },
   ],
 };
+
+function rosterSetup() { return {
+  league: { league_id: 'lg-r1', tenant_id: 'tenant-alpha', sport_id: 'football', transfer_window: { open: '2026-09-01', close: '2026-09-30' }, max_squad_size: 4, required_positions: { gk: 1 } },
+  squads: [
+    { squad_id: 'sq-a', club_id: 'club-a', tenant_id: 'tenant-alpha', name: 'A' },
+    { squad_id: 'sq-b', club_id: 'club-b', tenant_id: 'tenant-alpha', name: 'B' },
+  ],
+  players: [
+    { player_id: 'p1', name: 'Ali', position: 'gk', squad_id: 'sq-a', role: 'captain' },
+    { player_id: 'p2', name: 'Bilal', position: 'df', squad_id: 'sq-a', role: 'starter' },
+    { player_id: 'p3', name: 'Danish', position: 'fw', squad_id: 'sq-b', role: 'starter' },
+  ],
+  matches_in_progress: [{ match_id: 'm-live', home_squad_id: 'sq-a', away_squad_id: 'sq-b' }],
+}; }
+
+function transferBody(requestId, extra) {
+  return { request_id: requestId, league_id: 'lg-r1', player_id: 'p2', type: 'transfer', from_squad_id: 'sq-a', to_squad_id: 'sq-b', effective_date: '2026-09-15', loan_end_date: null, reason: 'Tactical move', requested_by: 'user-77', ...extra };
+}
 
 function checkoutBody(orderId, variantId, token) {
   return { order_id: orderId, customer_id: 'cust-001', items: [{ variant_id: variantId, quantity: 1 }], discount_code: null, payment: { token } };
