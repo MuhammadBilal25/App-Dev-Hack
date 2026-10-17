@@ -12,10 +12,13 @@ enum SyncStripState { online, offline, syncing, rejected }
 /// Always-visible sync strip directly below the app bar (UI.md §6.5, NFR-4). A live region, so
 /// screen readers announce every change.
 class SyncStrip extends ConsumerStatefulWidget {
-  const SyncStrip({super.key, this.showViewAction = true});
+  const SyncStrip({super.key, this.showViewAction = true, this.onlineLabel = 'Online · all changes synced'});
 
   /// False on the sync queue screen itself, where "View" would lead nowhere.
   final bool showViewAction;
+
+  /// Text of the online state, e.g. "Online · score updates live" on Match detail.
+  final String onlineLabel;
 
   @override
   ConsumerState<SyncStrip> createState() => _SyncStripState();
@@ -51,7 +54,7 @@ class _SyncStripState extends ConsumerState<SyncStrip> with SingleTickerProvider
     final actions = pending == 1 ? '1 action' : '$pending actions';
     final rejected = q.rejectedCount == 1 ? '1 action not applied' : '${q.rejectedCount} actions not applied';
     final (StatusPair c, IconData icon, String text, bool hasAction) = switch (s) {
-      SyncStripState.online => (status.success, Icons.check_circle_outline, 'Online · all changes synced', false),
+      SyncStripState.online => (status.success, Icons.check, widget.onlineLabel, false),
       SyncStripState.offline => (status.warning, Icons.wifi_off, 'Offline · $actions waiting', true),
       SyncStripState.syncing => (status.info, Icons.sync, 'Syncing $actions…', false),
       SyncStripState.rejected => (status.danger, Icons.cancel_outlined, rejected, true),

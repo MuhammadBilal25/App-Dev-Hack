@@ -21,12 +21,68 @@ class StandingsScreen extends ConsumerStatefulWidget {
 class _StandingsScreenState extends ConsumerState<StandingsScreen> {
   String? _leagueId;
 
+  /// Same selection as before (sets `_leagueId`), offered from the header's "Change" button.
+  Future<void> _change(List<League> leagues, String current) async {
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      useSafeArea: true,
+      builder: (sheet) {
+        final text = Theme.of(sheet).textTheme;
+        final scheme = Theme.of(sheet).colorScheme;
+        return Semantics(
+          identifier: 'standings_league_sheet',
+          container: true,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(AppSpace.xl, 0, AppSpace.xl, AppSpace.xl),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Semantics(header: true, child: Text('Choose a league', style: text.titleLarge)),
+                const SizedBox(height: AppSpace.md),
+                for (final l in leagues)
+                  Semantics(
+                    identifier: 'standings_league_${l.id}',
+                    button: true,
+                    selected: l.id == current,
+                    child: ListTile(
+                      minTileHeight: AppSize.rowMin,
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(l.name, style: text.titleMedium),
+                      subtitle: Text(l.sportName),
+                      trailing: l.id == current ? Icon(Icons.check, color: scheme.primary) : null,
+                      onTap: () => Navigator.of(sheet).pop(l.id),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (picked != null && mounted) setState(() => _leagueId = picked);
+  }
+
   @override
   Widget build(BuildContext context) {
     final leagues = ref.watch(leaguesProvider);
+    final list = leagues.value?.data ?? const <League>[];
+    final withGames = list.where((l) => l.fixtureCount > 0);
+    final id = list.isEmpty ? null : _leagueId ?? (withGames.isNotEmpty ? withGames.first.id : list.first.id);
+    final current = list.where((l) => l.id == id).firstOrNull;
     return TabPage(
       id: 'standings_screen',
       title: 'Standings',
+      subtitle: current?.name,
+      trailing: list.length > 1 && id != null
+          ? Semantics(
+              identifier: 'standings_change',
+              button: true,
+              label: 'Change league',
+              excludeSemantics: true,
+              child: OutlinedButton(onPressed: () => _change(list, id), child: const Text('Change')),
+            )
+          : null,
       onRefresh: () async {
         ref.invalidate(leaguesProvider);
         if (_leagueId != null) ref.invalidate(standingsProvider(_leagueId!));
@@ -37,43 +93,14 @@ class _StandingsScreenState extends ConsumerState<StandingsScreen> {
           value: leagues,
           onRetry: () => ref.invalidate(leaguesProvider),
           builder: (r) {
-            if (r.data.isEmpty) {
+            if (r.data.isEmpty || id == null) {
               return const EmptyState(
                 id: 'standings_empty',
                 icon: Icons.leaderboard_outlined,
                 message: 'No leagues yet. Standings appear here once your organisation runs a league.',
               );
             }
-            final withGames = r.data.where((l) => l.fixtureCount > 0);
-            final id = _leagueId ?? (withGames.isNotEmpty ? withGames.first.id : r.data.first.id);
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (r.data.length > 1) ...[
-                  Wrap(
-                    spacing: AppSpace.sm,
-                    runSpacing: AppSpace.sm,
-                    children: [
-                      for (final l in r.data)
-                        Semantics(
-                          identifier: 'standings_league_${l.id}',
-                          button: true,
-                          selected: l.id == id,
-                          child: ChoiceChip(
-                            label: Text(l.name),
-                            selected: l.id == id,
-                            showCheckmark: false,
-                            materialTapTargetSize: MaterialTapTargetSize.padded,
-                            onSelected: (_) => setState(() => _leagueId = l.id),
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpace.lg),
-                ],
-                _Table(leagueId: id),
-              ],
-            );
+            return _Table(leagueId: id);
           },
         ),
       ],
@@ -104,16 +131,12 @@ class _Table extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (r.fromCache) const CachedNotice(),
-            Text(s.leagueName, style: text.titleLarge),
-            const SizedBox(height: AppSpace.md),
             if (s.spots > 0)
               Container(
-                padding: const EdgeInsets.all(AppSpace.md),
-                decoration: BoxDecoration(color: scheme.primaryContainer, borderRadius: BorderRadius.circular(AppRadius.md)),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg, vertical: AppSpace.md),
+                decoration: BoxDecoration(color: scheme.primaryContainer, borderRadius: BorderRadius.circular(AppRadius.lg)),
                 child: Row(
                   children: [
-                    Icon(Icons.emoji_events_outlined, color: scheme.onPrimaryContainer, size: 20),
-                    const SizedBox(width: AppSpace.sm),
                     Expanded(
                       child: Text(
                         'Top ${s.spots} qualify for the playoffs',

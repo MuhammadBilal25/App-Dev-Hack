@@ -19,7 +19,10 @@ class PageBody extends StatelessWidget {
       children: [
         for (final c in children)
           Center(
-            child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: AppSize.maxContentWidth), child: c),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: AppSize.maxContentWidth),
+              child: SizedBox(width: double.infinity, child: c),
+            ),
           ),
       ],
     );

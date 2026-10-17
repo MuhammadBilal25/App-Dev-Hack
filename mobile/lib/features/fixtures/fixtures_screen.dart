@@ -152,8 +152,7 @@ class _FilterChips extends StatelessWidget {
                 duration: AppMotion.of(context, AppMotion.fast),
                 curve: AppMotion.fastCurve,
                 constraints: const BoxConstraints(minHeight: AppSize.touch, minWidth: AppSize.touch),
-                padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
-                alignment: Alignment.center,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: AppSpace.sm),
                 decoration: BoxDecoration(
                   color: f == selected ? scheme.inverseSurface : scheme.surfaceContainerLowest,
                   borderRadius: BorderRadius.circular(AppRadius.full),
@@ -162,7 +161,6 @@ class _FilterChips extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (f == FixtureFilter.live) ...[LiveDot(size: 7, color: f == selected ? scheme.onInverseSurface : null), const SizedBox(width: 6)],
                     Text(
                       f.label,
                       style: text.bodyMedium!.copyWith(

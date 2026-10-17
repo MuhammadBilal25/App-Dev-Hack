@@ -5,11 +5,11 @@ import '../theme/tokens.dart';
 
 /// Status chip (UI.md §6.3): always an icon or symbol + a word, never colour alone.
 class StatusChip extends StatelessWidget {
-  const StatusChip({super.key, required this.kind, required this.label, required this.icon});
+  const StatusChip({super.key, required this.kind, required this.label, this.icon});
 
   final StatusKind kind;
   final String label;
-  final IconData icon;
+  final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
@@ -23,8 +23,7 @@ class StatusChip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 14, color: c.fg),
-            const SizedBox(width: AppSpace.xs),
+            if (icon != null) ...[Icon(icon, size: 14, color: c.fg), const SizedBox(width: AppSpace.xs)],
             Flexible(
               child: Text(
                 label,

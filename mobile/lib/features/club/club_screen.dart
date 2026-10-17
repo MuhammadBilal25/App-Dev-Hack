@@ -9,6 +9,7 @@ import '../../core/theme/typography.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/async_view.dart';
 import '../../core/widgets/empty_state.dart';
+import '../../core/widgets/underline_tabs.dart';
 import '../../data/models.dart';
 import '../../data/providers.dart';
 import '../shell/tab_page.dart';
@@ -132,20 +133,11 @@ class _ClubProfileViewState extends ConsumerState<_ClubProfileView> {
               AppButton(id: 'club_manage', label: 'Manage', icon: Icons.manage_accounts_outlined, onPressed: () => _showManage(context, c)),
             ],
             const SizedBox(height: AppSpace.lg),
-            Semantics(
-              identifier: 'club_tabs',
-              child: SizedBox(
-                width: double.infinity,
-                child: SegmentedButton<int>(
-                  segments: [
-                    ButtonSegment(value: 0, label: Text('Roster (${c.roster.length})')),
-                    ButtonSegment(value: 1, label: Text('Staff (${c.staff.length})')),
-                  ],
-                  selected: {_tab},
-                  showSelectedIcon: false,
-                  onSelectionChanged: (s) => setState(() => _tab = s.first),
-                ),
-              ),
+            UnderlineTabs(
+              id: 'club_tab',
+              labels: ['Roster (${c.roster.length})', 'Staff (${c.staff.length})'],
+              index: _tab,
+              onChanged: (i) => setState(() => _tab = i),
             ),
             const SizedBox(height: AppSpace.md),
             AnimatedSwitcher(

@@ -51,16 +51,18 @@ class _LiveDotState extends State<LiveDot> with SingleTickerProviderStateMixin {
 
 /// "● LIVE 67'" chip used under the score.
 class LiveChip extends StatelessWidget {
-  const LiveChip({super.key, this.minute, this.onDark = false});
+  const LiveChip({super.key, this.minute, this.onHero = false});
 
   final int? minute;
-  final bool onDark;
+  /// On the match header: white chip with orange text (light), orange chip (dark).
+  final bool onHero;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final fg = onDark ? scheme.onTertiary : context.status.live;
-    final bg = onDark ? scheme.tertiary : scheme.surfaceContainerLowest;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final fg = onHero && dark ? scheme.onTertiary : context.status.live;
+    final bg = onHero && dark ? scheme.tertiary : scheme.surfaceContainerLowest;
     final label = minute == null ? 'LIVE' : "LIVE $minute'";
     return Semantics(
       label: minute == null ? 'Live' : 'Live, minute $minute',

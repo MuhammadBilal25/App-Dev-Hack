@@ -170,7 +170,7 @@ ThemeData buildTheme(Brightness brightness, TenantBrand tenant) {
         final selected = s.contains(WidgetState.selected);
         return text.labelSmall!.copyWith(color: selected ? brand : p.muted, fontWeight: selected ? FontWeight.w800 : FontWeight.w600);
       }),
-      iconTheme: WidgetStateProperty.resolveWith((s) => IconThemeData(color: s.contains(WidgetState.selected) ? onSoft : p.muted)),
+      iconTheme: WidgetStateProperty.resolveWith((s) => IconThemeData(color: s.contains(WidgetState.selected) ? brand : p.muted)),
     ),
     bottomSheetTheme: BottomSheetThemeData(
       backgroundColor: p.surface,

@@ -7,7 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 
-import '../../core/auth/auth_controller.dart';
+import '../../core/brand/jersey_icon.dart';
 import '../../core/layout/page_body.dart';
 import '../../core/settings/settings.dart';
 import '../../core/theme/tenant.dart';
@@ -20,9 +20,9 @@ import '../../core/widgets/app_button.dart';
 import '../../core/widgets/async_view.dart';
 import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/live_dot.dart';
-import '../../core/widgets/role_badge.dart';
 import '../../core/widgets/status_chip.dart';
 import '../../core/widgets/sync_strip.dart';
+import '../../core/widgets/underline_tabs.dart';
 import '../../data/models.dart';
 import '../../data/providers.dart';
 import '../store/product_sheet.dart';
@@ -103,7 +103,8 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
       body: Column(
         children: [
           _Hero(detail: detail),
-          const SyncStrip(),
+          const SyncStrip(onlineLabel: 'Online · score updates live'),
+          UnderlineTabs(id: 'match_tab', labels: const ['Timeline', 'Line-ups'], index: _tab, onChanged: (i) => setState(() => _tab = i)),
           Expanded(
             child: Semantics(
               identifier: 'match_screen',
@@ -123,8 +124,6 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
                           _ScorePanel(detail: r.data),
                           const SizedBox(height: AppSpace.lg),
                         ],
-                        _Tabs(index: _tab, onChanged: (i) => setState(() => _tab = i)),
-                        const SizedBox(height: AppSpace.md),
                         AnimatedSwitcher(
                           duration: AppMotion.of(context, AppMotion.medium),
                           child: _tab == 0
@@ -132,7 +131,7 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
                               : _LineUps(key: const ValueKey('lineups'), detail: r.data),
                         ),
                         if (r.data.pinned != null) ...[
-                          const SectionLabel('Match-day shop'),
+                          const SizedBox(height: AppSpace.xl),
                           _PinnedProduct(product: r.data.pinned!),
                         ],
                       ],
@@ -148,25 +147,25 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
   }
 }
 
-class _Hero extends ConsumerWidget {
+/// Brand header in light mode, surface header in dark mode (approved design).
+class _Hero extends StatelessWidget {
   const _Hero({required this.detail});
 
   final MatchDetail? detail;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
     final dark = Theme.of(context).brightness == Brightness.dark;
     final on = dark ? scheme.onSurface : scheme.onPrimary;
-    final user = ref.watch(currentUserProvider);
     final f = detail?.fixture;
     return Material(
-      color: dark ? scheme.primaryContainer : scheme.primary,
+      color: dark ? scheme.surfaceContainerLowest : scheme.primary,
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(AppSpace.xs, AppSpace.xs, AppSpace.lg, AppSpace.xl),
+          padding: const EdgeInsets.fromLTRB(AppSpace.xs, AppSpace.xs, AppSpace.xs, AppSpace.xl),
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: AppSize.maxContentWidth),
@@ -182,7 +181,7 @@ class _Hero extends ConsumerWidget {
                         child: IconButton(
                           tooltip: 'Back',
                           color: on,
-                          icon: const Icon(Icons.arrow_back),
+                          icon: const Icon(Icons.arrow_back_ios_new, size: 20),
                           onPressed: () => context.canPop() ? context.pop() : context.go('/fixtures'),
                         ),
                       ),
@@ -191,14 +190,16 @@ class _Hero extends ConsumerWidget {
                           f == null ? 'Match' : '${f.leagueName} · Round ${f.round}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: text.bodyMedium!.copyWith(color: on, fontWeight: FontWeight.w700),
+                          textAlign: TextAlign.center,
+                          style: text.bodyMedium!.copyWith(color: dark ? scheme.onSurfaceVariant : on, fontWeight: FontWeight.w600),
                         ),
                       ),
-                      if (user != null) RoleBadge(role: user.role),
+                      // Balances the back button so the competition line stays centred.
+                      const SizedBox(width: AppSize.touch),
                     ],
                   ),
                   if (f != null) ...[
-                    const SizedBox(height: AppSpace.md),
+                    const SizedBox(height: AppSpace.sm),
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -228,19 +229,18 @@ class _HeroTeam extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final dark = Theme.of(context).brightness == Brightness.dark;
-    final on = dark ? scheme.onSurface : scheme.onPrimary;
     return Column(
       children: [
         ExcludeSemantics(
           child: Container(
-            width: 44,
-            height: 44,
+            width: 48,
+            height: 48,
             alignment: Alignment.center,
-            decoration: BoxDecoration(color: dark ? scheme.surfaceContainerHigh : scheme.surfaceContainerLowest, shape: BoxShape.circle),
+            decoration: BoxDecoration(color: dark ? scheme.surface : scheme.surfaceContainerLowest, shape: BoxShape.circle),
             child: Text(
               initialsOf(team.name),
               textScaler: TextScaler.noScaling,
-              style: TextStyle(fontFamily: AppFonts.display, fontWeight: FontWeight.w700, fontSize: 12, color: dark ? scheme.onPrimaryContainer : scheme.primary),
+              style: TextStyle(fontFamily: AppFonts.body, fontWeight: FontWeight.w800, fontSize: 13, color: scheme.primary),
             ),
           ),
         ),
@@ -250,7 +250,7 @@ class _HeroTeam extends StatelessWidget {
           textAlign: TextAlign.center,
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
-          style: Theme.of(context).textTheme.titleMedium!.copyWith(color: on),
+          style: Theme.of(context).textTheme.titleMedium!.copyWith(color: dark ? scheme.onSurface : scheme.onPrimary),
         ),
       ],
     );
@@ -266,8 +266,8 @@ class _HeroScore extends StatelessWidget {
   Widget build(BuildContext context) {
     final f = fixture;
     final scheme = Theme.of(context).colorScheme;
-    final on = Theme.of(context).brightness == Brightness.dark ? scheme.onSurface : scheme.onPrimary;
-    final style = Theme.of(context).textTheme.displayMedium!.copyWith(color: on);
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final style = Theme.of(context).textTheme.displayMedium!.copyWith(color: dark ? scheme.onSurface : scheme.onPrimary);
     final score = f.hasScore ? '${f.home.display} : ${f.away.display}' : DateFormat.Hm().format(f.kickoff);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpace.sm),
@@ -288,12 +288,12 @@ class _HeroScore extends StatelessWidget {
               child: FittedBox(key: ValueKey(score), fit: BoxFit.scaleDown, child: Text(score, style: style, maxLines: 1)),
             ),
           ),
-          const SizedBox(height: AppSpace.sm),
+          const SizedBox(height: AppSpace.xs),
           switch (f.status) {
-            MatchStatus.live => LiveChip(minute: f.minute, onDark: true),
-            MatchStatus.completed => _OnBrandChip(label: 'Full time'),
-            MatchStatus.postponed => _OnBrandChip(label: 'Postponed'),
-            MatchStatus.upcoming => _OnBrandChip(label: DateFormat('EEE d MMM').format(f.kickoff)),
+            MatchStatus.live => LiveChip(minute: f.minute, onHero: true),
+            MatchStatus.completed => const _HeroChip(label: 'Full time'),
+            MatchStatus.postponed => const _HeroChip(label: 'Postponed'),
+            MatchStatus.upcoming => _HeroChip(label: DateFormat('EEE d MMM').format(f.kickoff)),
           },
         ],
       ),
@@ -301,65 +301,23 @@ class _HeroScore extends StatelessWidget {
   }
 }
 
-class _OnBrandChip extends StatelessWidget {
-  const _OnBrandChip({required this.label});
+class _HeroChip extends StatelessWidget {
+  const _HeroChip({required this.label});
 
   final String label;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: AppSpace.sm, vertical: 3),
-      decoration: BoxDecoration(color: scheme.onPrimary.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(AppRadius.sm)),
-      child: Text(
-        label,
-        style: Theme.of(context).textTheme.labelSmall!.copyWith(
-              color: Theme.of(context).brightness == Brightness.dark ? scheme.onSurface : scheme.onPrimary,
-            ),
+      decoration: BoxDecoration(
+        color: dark ? scheme.surfaceContainerHigh : scheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
+      child: Text(label, style: Theme.of(context).textTheme.labelSmall!.copyWith(color: dark ? scheme.onSurface : scheme.primary)),
     );
-  }
-}
-
-class _Tabs extends StatelessWidget {
-  const _Tabs({required this.index, required this.onChanged});
-
-  final int index;
-  final ValueChanged<int> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final text = Theme.of(context).textTheme;
-    Widget tab(int i, String label) => Expanded(
-          child: Semantics(
-            identifier: 'match_tab_${i == 0 ? 'timeline' : 'lineups'}',
-            button: true,
-            selected: i == index,
-            excludeSemantics: true,
-            label: label,
-            child: InkWell(
-              onTap: () => onChanged(i),
-              child: AnimatedContainer(
-                duration: AppMotion.of(context, AppMotion.fast),
-                height: AppSize.touch,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  border: Border(bottom: BorderSide(color: i == index ? scheme.primary : scheme.outlineVariant, width: i == index ? 2.5 : 1)),
-                ),
-                child: Text(
-                  label,
-                  style: text.bodyLarge!.copyWith(
-                    color: i == index ? scheme.primary : scheme.onSurfaceVariant,
-                    fontWeight: i == index ? FontWeight.w800 : FontWeight.w600,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        );
-    return Row(children: [tab(0, 'Timeline'), tab(1, 'Line-ups')]);
   }
 }
 
@@ -374,16 +332,13 @@ class _Timeline extends StatelessWidget {
     if (events.isEmpty) {
       return const EmptyState(id: 'timeline_empty', icon: Icons.sports_outlined, message: 'Nothing has happened yet. Events appear here live.');
     }
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        children: [
-          for (var i = 0; i < events.length; i++) ...[
-            if (i > 0) const Divider(),
-            _TimelineRow(event: events[i], detail: detail),
-          ],
+    return Column(
+      children: [
+        for (var i = 0; i < events.length; i++) ...[
+          if (i > 0) const Divider(),
+          _TimelineRow(event: events[i], detail: detail),
         ],
-      ),
+      ],
     );
   }
 }
@@ -436,22 +391,33 @@ class _TimelineRow extends ConsumerWidget {
       child: ConstrainedBox(
         constraints: const BoxConstraints(minHeight: AppSize.rowMin),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg, vertical: AppSpace.md),
+          padding: const EdgeInsets.symmetric(vertical: AppSpace.sm),
           child: Row(
             children: [
               SizedBox(
-                width: 44,
-                child: Text(minute, style: text.titleMedium!.copyWith(fontFeatures: AppFonts.tabular, decoration: strike, color: e.compensated ? muted : null)),
+                width: 48,
+                child: Text(
+                  minute,
+                  style: text.titleMedium!.copyWith(fontWeight: FontWeight.w800, fontFeatures: AppFonts.tabular, color: e.compensated ? muted : null),
+                ),
               ),
               Expanded(
-                child: Text(
-                  what,
+                child: Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(text: e.label),
+                      if (e.teamName != null) ...[
+                        const TextSpan(text: ' · '),
+                        TextSpan(text: e.teamName, style: TextStyle(fontWeight: e.compensated ? FontWeight.w400 : FontWeight.w700)),
+                      ],
+                    ],
+                  ),
                   style: text.bodyLarge!.copyWith(decoration: strike, color: e.compensated ? muted : null),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              if (e.compensated) const StatusChip(kind: StatusKind.neutral, label: 'Disallowed', icon: Icons.block),
+              if (e.compensated) const StatusChip(kind: StatusKind.neutral, label: 'Disallowed'),
               if (detail.canScore && e.correctable)
                 Semantics(
                   identifier: 'timeline_correct_${e.id}',
@@ -603,42 +569,55 @@ class _PinnedProduct extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpace.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
+    return Container(
+      padding: const EdgeInsets.all(AppSpace.md),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          ExcludeSemantics(
+            child: Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(color: scheme.primaryContainer, borderRadius: BorderRadius.circular(AppRadius.md)),
+              alignment: Alignment.center,
+              child: JerseyIcon(size: 34, color: scheme.primary),
+            ),
+          ),
+          const SizedBox(width: AppSpace.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(color: scheme.primaryContainer, borderRadius: BorderRadius.circular(AppRadius.md)),
-                  child: Icon(Icons.checkroom, color: scheme.onPrimaryContainer),
-                ),
-                const SizedBox(width: AppSpace.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(product.name, style: text.titleMedium, maxLines: 2, overflow: TextOverflow.ellipsis),
-                      Text(formatPrice(product.fromPriceMinor), style: text.bodyLarge!.copyWith(fontWeight: FontWeight.w800)),
-                    ],
-                  ),
-                ),
+                Text('FEATURED', style: text.bodySmall),
+                Text(product.name, style: text.titleMedium, maxLines: 2, overflow: TextOverflow.ellipsis),
+                Text(formatPrice(product.fromPriceMinor), style: text.bodyMedium),
               ],
             ),
-            const SizedBox(height: AppSpace.md),
-            AppButton(
-              id: 'pinned_buy',
-              label: product.soldOut ? 'Sold out' : 'Buy',
-              icon: Icons.shopping_bag_outlined,
-              variant: AppButtonVariant.cta,
+          ),
+          const SizedBox(width: AppSpace.sm),
+          Semantics(
+            identifier: 'pinned_buy',
+            button: true,
+            enabled: !product.soldOut,
+            label: product.soldOut ? 'Sold out' : 'Buy ${product.name}',
+            excludeSemantics: true,
+            child: FilledButton(
               onPressed: product.soldOut ? null : () => showProductSheet(context, product),
+              style: FilledButton.styleFrom(
+                backgroundColor: scheme.tertiary,
+                foregroundColor: scheme.onTertiary,
+                minimumSize: const Size(64, AppSize.buttonSecondary),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
+              ),
+              child: Text(product.soldOut ? 'Sold out' : 'Buy'),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

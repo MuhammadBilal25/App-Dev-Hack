@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/brand/jersey_icon.dart';
 import '../../core/theme/status_colors.dart';
+import '../../core/theme/typography.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/async_view.dart';
 import '../../core/widgets/empty_state.dart';
@@ -19,7 +21,7 @@ class StoreScreen extends ConsumerWidget {
     final value = ref.watch(catalogueProvider);
     return TabPage(
       id: 'store_screen',
-      title: 'Store',
+      title: 'Club Store',
       onRefresh: () => ref.refresh(catalogueProvider.future),
       children: [
         AsyncView<List<Product>>(
@@ -80,7 +82,9 @@ class ProductCard extends StatelessWidget {
                 child: Container(
                   color: scheme.primaryContainer,
                   alignment: Alignment.center,
-                  child: Icon(p.category == 'apparel' ? Icons.checkroom : Icons.shopping_bag_outlined, size: 56, color: scheme.onPrimaryContainer),
+                  child: p.category == 'apparel'
+                      ? JerseyIcon(size: 64, color: scheme.primary)
+                      : Icon(Icons.shopping_bag_outlined, size: 56, color: scheme.primary),
                 ),
               ),
               Padding(
@@ -89,10 +93,8 @@ class ProductCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(p.name, style: text.titleMedium, maxLines: 2, overflow: TextOverflow.ellipsis),
-                    if (p.clubName.isNotEmpty)
-                      Text(p.clubName, style: text.bodyMedium!.copyWith(color: scheme.onSurfaceVariant), maxLines: 1, overflow: TextOverflow.ellipsis),
-                    const SizedBox(height: AppSpace.sm),
-                    Text(formatPrice(p.fromPriceMinor), style: text.titleMedium!.copyWith(fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 2),
+                    Text(formatPrice(p.fromPriceMinor), style: text.bodyMedium!.copyWith(color: scheme.onSurfaceVariant, fontFeatures: AppFonts.tabular)),
                     if (p.soldOut || lowStock) ...[
                       const SizedBox(height: AppSpace.sm),
                       p.soldOut

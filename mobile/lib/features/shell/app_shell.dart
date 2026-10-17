@@ -14,11 +14,11 @@ class _Tab {
 }
 
 const _tabs = [
-  _Tab('tab_fixtures', 'Fixtures', Icons.calendar_month_outlined, Icons.calendar_month),
-  _Tab('tab_standings', 'Standings', Icons.leaderboard_outlined, Icons.leaderboard),
-  _Tab('tab_store', 'Store', Icons.storefront_outlined, Icons.storefront),
-  _Tab('tab_club', 'Club', Icons.shield_outlined, Icons.shield),
-  _Tab('tab_profile', 'Profile', Icons.person_outline, Icons.person),
+  _Tab('tab_fixtures', 'Fixtures', Icons.calendar_today_outlined, Icons.calendar_today_outlined),
+  _Tab('tab_standings', 'Standings', Icons.bar_chart_rounded, Icons.bar_chart_rounded),
+  _Tab('tab_store', 'Store', Icons.shopping_bag_outlined, Icons.shopping_bag_outlined),
+  _Tab('tab_club', 'Club', Icons.shield_outlined, Icons.shield_outlined),
+  _Tab('tab_profile', 'Profile', Icons.person_outline, Icons.person_outline),
 ];
 
 /// Five labelled tabs, the same for every role (UI.md §6.6). Role-only tools live inside screens.

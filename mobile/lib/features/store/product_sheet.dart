@@ -258,12 +258,18 @@ class _SizeButton extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                selected ? '${variant.size} ✓' : variant.size,
-                style: text.titleMedium!.copyWith(
-                  color: soldOut ? scheme.onSurfaceVariant : selected ? scheme.onPrimaryContainer : scheme.onSurface,
-                  decoration: soldOut ? TextDecoration.lineThrough : null,
-                ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    variant.size,
+                    style: text.titleMedium!.copyWith(
+                      color: soldOut ? scheme.onSurfaceVariant : selected ? scheme.primary : scheme.onSurface,
+                      decoration: soldOut ? TextDecoration.lineThrough : null,
+                    ),
+                  ),
+                  if (selected) ...[const SizedBox(width: 2), Icon(Icons.check, size: 18, color: scheme.primary)],
+                ],
               ),
               const SizedBox(height: 2),
               if (variant.stock == 1)
@@ -273,7 +279,10 @@ class _SizeButton extends StatelessWidget {
                   child: Text('Last one!', style: text.labelSmall!.copyWith(color: context.status.warning.fg)),
                 )
               else
-                Text(soldOut ? stockText : '${variant.stock} in stock', style: text.labelSmall!.copyWith(color: scheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
+                Text(
+                  soldOut ? stockText : '${variant.stock} in stock',
+                  style: text.labelSmall!.copyWith(color: selected ? scheme.primary : scheme.onSurfaceVariant, fontWeight: FontWeight.w600),
+                ),
             ],
           ),
         ),
