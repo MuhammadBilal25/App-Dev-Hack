@@ -1,12 +1,8 @@
-import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/api/api_client.dart';
 import '../../core/api/api_exception.dart';
-import '../../core/auth/auth_controller.dart';
 import '../../core/theme/status_colors.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/app_button.dart';
@@ -15,8 +11,11 @@ import '../../core/widgets/confirm_sheet.dart';
 import '../../core/widgets/error_banner.dart';
 import '../../data/models.dart';
 import '../../data/providers.dart';
+import 'cart.dart';
 
 Future<void> showProductSheet(BuildContext context, Product product) {
+  // A snackbar from a previous add would cover the sheet's buttons.
+  ScaffoldMessenger.of(context).hideCurrentSnackBar();
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -55,15 +54,9 @@ class _ProductSheetState extends ConsumerState<ProductSheet> {
     super.dispose();
   }
 
-  static String _orderId() {
-    final r = Random.secure();
-    return 'ord-${DateTime.now().millisecondsSinceEpoch.toRadixString(36)}-${List.generate(6, (_) => r.nextInt(36).toRadixString(36)).join()}';
-  }
-
   Future<void> _pay() async {
     final v = _selected;
-    final user = ref.read(currentUserProvider);
-    if (v == null || user == null) return;
+    if (v == null) return;
     final confirm = await ConfirmSheet.show(
       context,
       id: 'confirm_pay',
@@ -78,22 +71,13 @@ class _ProductSheetState extends ConsumerState<ProductSheet> {
       _error = null;
       _discountError = null;
     });
-    final code = _discount.text.trim().toUpperCase();
+    final lines = [CartLine(product: widget.product, variant: v, quantity: 1)];
     try {
-      final body = await ref.read(apiClientProvider).post('/audit/v1/checkout', body: {
-        'order_id': _orderId(),
-        'customer_id': user.id,
-        'items': [
-          {'variant_id': v.id, 'quantity': 1},
-        ],
-        if (code.isNotEmpty) 'discount_code': code,
-        'payment': {'token': 'tok_success'},
-      }) as Map<String, dynamic>;
-      ref.invalidate(catalogueProvider);
+      final order = await checkoutLines(ref, lines, discountCode: _discount.text);
       if (!mounted) return;
       final router = GoRouter.of(context);
       Navigator.of(context).pop();
-      router.push('/receipt', extra: {'order': body, 'product': widget.product, 'variant': v});
+      router.push('/receipt', extra: receiptExtra(order, lines));
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -107,6 +91,20 @@ class _ProductSheetState extends ConsumerState<ProductSheet> {
     } finally {
       if (mounted) setState(() => _paying = false);
     }
+  }
+
+  void _addToCart() {
+    final v = _selected;
+    if (v == null) return;
+    final added = ref.read(cartProvider.notifier).add(widget.product, v);
+    final messenger = ScaffoldMessenger.of(context);
+    if (added) Navigator.of(context).pop();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(added ? 'Added to cart: ${widget.product.name} (${v.size})' : 'No more of size ${v.size} can be added. Check the cart.'),
+        duration: AppMotion.snackbar,
+      ),
+    );
   }
 
   @override
@@ -211,6 +209,13 @@ class _ProductSheetState extends ConsumerState<ProductSheet> {
                                   ),
                       ),
                     ),
+                  ),
+                  const SizedBox(height: AppSpace.md),
+                  AppButton(
+                    id: 'product_add_to_cart',
+                    label: 'Add to cart',
+                    variant: AppButtonVariant.secondary,
+                    onPressed: v == null || _paying ? null : _addToCart,
                   ),
                 ],
               ),

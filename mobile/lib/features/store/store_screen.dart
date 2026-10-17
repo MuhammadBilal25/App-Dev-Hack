@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/brand/jersey_icon.dart';
 import '../../core/theme/status_colors.dart';
@@ -11,6 +12,7 @@ import '../../core/widgets/status_chip.dart';
 import '../../data/models.dart';
 import '../../data/providers.dart';
 import '../shell/tab_page.dart';
+import 'cart.dart';
 import 'product_sheet.dart';
 
 class StoreScreen extends ConsumerWidget {
@@ -19,9 +21,24 @@ class StoreScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final value = ref.watch(catalogueProvider);
+    final count = ref.watch(cartProvider).fold(0, (n, l) => n + l.quantity);
     return TabPage(
       id: 'store_screen',
       title: 'Club Store',
+      trailing: Semantics(
+        identifier: 'store_cart',
+        button: true,
+        label: count == 0 ? 'Cart, empty' : 'Cart, $count ${count == 1 ? 'item' : 'items'}',
+        excludeSemantics: true,
+        child: OutlinedButton.icon(
+          onPressed: () {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+            context.push('/cart');
+          },
+          icon: const Icon(Icons.shopping_bag_outlined, size: 20),
+          label: Text('Cart · $count'),
+        ),
+      ),
       onRefresh: () => ref.refresh(catalogueProvider.future),
       children: [
         AsyncView<List<Product>>(

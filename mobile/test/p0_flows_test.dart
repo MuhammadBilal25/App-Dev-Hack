@@ -1,4 +1,4 @@
-// P0 flows from the official spec: the Section 8.4 offline desk check.
+// P0 flows from the official spec: the Section 8.4 offline desk check and the Section 8.2 cart.
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -16,7 +16,9 @@ import 'package:huddle/core/cache/api_cache.dart';
 import 'package:huddle/core/connectivity/connectivity.dart';
 import 'package:huddle/core/settings/settings.dart';
 import 'package:huddle/core/sync/sync_queue.dart';
+import 'package:huddle/data/models.dart';
 import 'package:huddle/features/match/match_screen.dart';
+import 'package:huddle/features/store/cart.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app_test.dart' show MemoryTokenStore, fakeBackend;
@@ -262,5 +264,143 @@ void main() {
         await tester.pump(const Duration(seconds: 5));
       });
     }
+  });
+
+  group('Section 8.2 store cart', () {
+    Product jersey({int m = 1, int l = 5}) => Product(
+          id: 'prod-jersey-001',
+          name: 'Alpha Falcons Home Jersey',
+          description: '',
+          category: 'apparel',
+          clubName: '',
+          variants: [
+            Variant(id: 'var-jersey-001-M', size: 'M', color: 'blue', priceMinor: 450000, stock: m),
+            Variant(id: 'var-jersey-001-L', size: 'L', color: 'blue', priceMinor: 450000, stock: l),
+          ],
+        );
+
+    test('cart merges a variant, caps by stock and the per-line limit, removes at zero', () {
+      final c = ProviderContainer(overrides: [tokenStoreProvider.overrideWithValue(MemoryTokenStore())]);
+      addTearDown(c.dispose);
+      final cart = c.read(cartProvider.notifier);
+      final p = jersey();
+      expect(cart.add(p, p.variants[0]), isTrue);
+      expect(cart.add(p, p.variants[0]), isFalse, reason: 'only 1 M in stock');
+      for (var i = 0; i < 5; i++) {
+        expect(cart.add(p, p.variants[1]), isTrue);
+      }
+      expect(cart.add(p, p.variants[1]), isFalse, reason: 'only 5 L in stock');
+      expect(c.read(cartProvider).map((l) => '${l.variant.size}x${l.quantity}'), ['Mx1', 'Lx5']);
+      expect(cart.count, 6);
+      cart.setQuantity('var-jersey-001-L', 99);
+      expect(c.read(cartProvider).last.quantity, 5);
+      cart.setQuantity('var-jersey-001-L', 0);
+      expect(c.read(cartProvider).map((l) => l.variant.size), ['M']);
+      final big = jersey(l: 50);
+      for (var i = 0; i < maxLineQuantity; i++) {
+        cart.add(big, big.variants[1]);
+      }
+      expect(cart.add(big, big.variants[1]), isFalse, reason: 'quantity is capped at 10 per variant');
+    });
+
+    Future<Backend> openStore(WidgetTester tester) async {
+      // A tall phone (412×915 dp) so the whole size sheet fits on screen.
+      tester.view.devicePixelRatio = 2.625;
+      tester.view.physicalSize = const Size(1081, 2402);
+      addTearDown(tester.view.reset);
+      final backend = Backend();
+      final device = StreamController<bool>.broadcast();
+      addTearDown(device.close);
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      await pumpApp(tester, backend: backend, queue: await openQueue(tester, 'q_store_${boxSeq++}'), device: device, tokens: MemoryTokenStore(), prefs: prefs);
+      await signIn(tester, 'viewer@nascon.test');
+      await tester.tap(find.text('Store').last);
+      await tester.pumpAndSettle();
+      return backend;
+    }
+
+    Future<void> addSize(WidgetTester tester, String size) async {
+      await tester.ensureVisible(find.text('Alpha Falcons Home Jersey'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Alpha Falcons Home Jersey'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(size).last);
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Add to cart'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Add to cart'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('variant -> add to cart -> real count -> cart -> checkout of the cart -> receipt', (tester) async {
+      final backend = await openStore(tester);
+      expect(find.text('Cart · 0'), findsOneWidget);
+
+      await addSize(tester, 'L');
+      expect(find.text('Added to cart: Alpha Falcons Home Jersey (L)'), findsOneWidget);
+      expect(find.text('Cart · 1'), findsOneWidget);
+      await addSize(tester, 'L');
+      await addSize(tester, 'M');
+      expect(find.text('Cart · 3'), findsOneWidget);
+
+      await tester.tap(find.text('Cart · 3'));
+      await tester.pumpAndSettle();
+      expect(find.text('Subtotal · 3 items'), findsOneWidget);
+      expect(find.text('PKR 13500.00'), findsWidgets);
+      expect(find.text('Size L · PKR 4500.00 each'), findsOneWidget);
+      // M has 1 in stock, so it can't go above 1; L can be lowered.
+      await tester.tap(find.byTooltip('One fewer L'));
+      await tester.pumpAndSettle();
+      expect(find.text('Subtotal · 2 items'), findsOneWidget);
+      expect(find.text('Only 1 in stock.'), findsOneWidget);
+
+      await tester.tap(find.text('Pay with mock card'));
+      await tester.pumpAndSettle();
+      expect(find.text('Pay PKR 9000.00?'), findsOneWidget);
+      await tester.tap(find.text('Pay').last);
+      await tester.pumpAndSettle();
+
+      final sent = backend.checkoutBodies.single;
+      expect(sent['items'], [
+        {'variant_id': 'var-jersey-001-L', 'quantity': 1},
+        {'variant_id': 'var-jersey-001-M', 'quantity': 1},
+      ]);
+      expect(sent['payment'], {'token': 'tok_success'});
+      expect(sent['customer_id'], 'user-viewer');
+      expect(find.text('Thank you for your order'), findsOneWidget);
+      expect(find.text('Alpha Falcons Home Jersey (L) × 1'), findsOneWidget);
+      expect(find.text('Alpha Falcons Home Jersey (M) × 1'), findsOneWidget);
+      expect(find.text('PKR 9000.00'), findsWidgets);
+
+      await tester.tap(find.byTooltip('Back'));
+      await tester.pumpAndSettle();
+      expect(find.text('Cart · 0'), findsOneWidget, reason: 'a paid cart is emptied');
+    });
+
+    testWidgets('a failed checkout keeps the cart and explains the error in plain words', (tester) async {
+      final backend = await openStore(tester);
+      backend.checkoutError = 'OUT_OF_STOCK';
+      await addSize(tester, 'M');
+      await tester.tap(find.text('Cart · 1'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Pay with mock card'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Pay').last);
+      await tester.pumpAndSettle();
+      expect(find.text('Sorry, this size just sold out. Try another size.'), findsOneWidget);
+      expect(find.textContaining('OUT_OF_STOCK'), findsNothing);
+      expect(find.text('Subtotal · 1 item'), findsOneWidget);
+    });
+
+    testWidgets('an empty cart says so and leads back to the store', (tester) async {
+      await openStore(tester);
+      await tester.tap(find.text('Cart · 0'));
+      await tester.pumpAndSettle();
+      expect(find.text('Your cart is empty. Browse the club store.'), findsOneWidget);
+      await tester.tap(find.text('Back to store'));
+      await tester.pumpAndSettle();
+      expect(find.text('Club Store'), findsOneWidget);
+    });
   });
 }

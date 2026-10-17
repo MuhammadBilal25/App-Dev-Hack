@@ -10,9 +10,9 @@ import '../../features/profile/profile_screen.dart';
 import '../../features/shell/app_shell.dart';
 import '../../features/splash/splash_screen.dart';
 import '../../features/standings/standings_screen.dart';
+import '../../features/store/cart_screen.dart';
 import '../../features/store/receipt_screen.dart';
 import '../../features/store/store_screen.dart';
-import '../../data/models.dart';
 import '../../features/sync/sync_queue_screen.dart';
 import '../auth/auth_controller.dart';
 
@@ -50,6 +50,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: Routes.login, builder: (_, _) => const LoginScreen()),
       GoRoute(path: Routes.sync, builder: (_, _) => const SyncQueueScreen()),
       GoRoute(path: '/match/:id', builder: (_, state) => MatchScreen(matchId: state.pathParameters['id']!)),
+      GoRoute(path: '/cart', builder: (_, _) => const CartScreen()),
       GoRoute(
         path: '/receipt',
         redirect: (_, state) => state.extra is Map ? null : Routes.store,
@@ -57,8 +58,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           final extra = state.extra as Map;
           return ReceiptScreen(
             order: Map<String, dynamic>.from(extra['order'] as Map),
-            product: extra['product'] as Product?,
-            variant: extra['variant'] as Variant?,
+            names: Map<String, String>.from((extra['names'] as Map?) ?? const {}),
           );
         },
       ),

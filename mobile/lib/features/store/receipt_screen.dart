@@ -16,11 +16,11 @@ import '../../data/models.dart';
 
 /// Signed receipt after a successful checkout, with the server-made PDF saved on request.
 class ReceiptScreen extends StatefulWidget {
-  const ReceiptScreen({super.key, required this.order, this.product, this.variant});
+  const ReceiptScreen({super.key, required this.order, this.names = const {}});
 
   final Map<String, dynamic> order;
-  final Product? product;
-  final Variant? variant;
+  /// Readable line names by variant id (e.g. "Home Jersey (L)"); the variant id is shown otherwise.
+  final Map<String, String> names;
 
   @override
   State<ReceiptScreen> createState() => _ReceiptScreenState();
@@ -94,9 +94,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                         children: [
                           for (final it in items)
                             line(
-                              widget.product == null
-                                  ? '${it['variant_id']} × ${it['quantity']}'
-                                  : '${widget.product!.name}${widget.variant == null ? '' : ' (${widget.variant!.size})'} × ${it['quantity']}',
+                              '${widget.names[it['variant_id']] ?? it['variant_id']} × ${it['quantity']}',
                               formatPrice(((it['unit_price_minor'] as num?)?.toInt() ?? 0) * ((it['quantity'] as num?)?.toInt() ?? 1)),
                             ),
                           const Divider(),
