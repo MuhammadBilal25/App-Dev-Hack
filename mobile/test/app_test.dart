@@ -108,6 +108,9 @@ http.Client fakeBackend() => MockClient((req) async {
           200,
         );
       }
+      if (req.method == 'POST' && req.url.path == '/api/v1/clubs/club-alpha-1/players') {
+        return http.Response(jsonEncode({'player': {'player_id': 'np'}, 'audit_entry': {'action': 'add'}}), 201);
+      }
       final canned = demoApi[req.url.path];
       if (canned != null) return http.Response(jsonEncode(canned), 200);
       return http.Response(jsonEncode({'error': {'code': 'NOT_FOUND', 'message': 'x', 'details': {}}}), 404);
@@ -200,6 +203,7 @@ final Map<String, Object> demoApi = {
     ],
     'stats': {'rank': 1, 'played': 1, 'points': 3},
     'can_manage': true,
+    'positions': ['gk'],
   },
   '/api/v1/catalogue': {
     'products': [_jersey],
@@ -216,7 +220,7 @@ void main() {
     cache = await Hive.openBox<String>(cacheBoxName);
   });
 
-  Future<void> pumpApp(WidgetTester tester) async {
+  Future<void> pumpApp(WidgetTester tester, {Box<String>? queueBox}) async {
     // The LIVE dot pulses forever; with animations off it is static, so pumpAndSettle can settle.
     tester.platformDispatcher.accessibilityFeaturesTestValue = const FakeAccessibilityFeatures(disableAnimations: true);
     addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
@@ -226,7 +230,7 @@ void main() {
       ProviderScope(
         overrides: [
           sharedPrefsProvider.overrideWithValue(prefs),
-          syncBoxProvider.overrideWithValue(box),
+          syncBoxProvider.overrideWithValue(queueBox ?? box),
           cacheBoxProvider.overrideWithValue(cache),
           // SSE: a stream that stays open and silent.
           sseClientFactoryProvider.overrideWithValue(
@@ -451,11 +455,43 @@ void main() {
     expect(find.text('Add goal?'), findsOneWidget);
     await tester.tap(find.text('Add'));
     // The queue writes to Hive (real disk IO), so let real time pass between frames.
-    for (var i = 0; i < 10 && find.text('Applied: Goal for Alpha Falcons FC').evaluate().isEmpty; i++) {
+    for (var i = 0; i < 40 && find.text('Applied: Goal for Alpha Falcons FC').evaluate().isEmpty; i++) {
       await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 100)));
       await tester.pump(const Duration(milliseconds: 100));
     }
     expect(find.text('Applied: Goal for Alpha Falcons FC'), findsOneWidget);
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 1700)));
+    await tester.pump(const Duration(seconds: 5));
+  });
+
+  testWidgets('club manager adds a player from Manage', (tester) async {
+    // A fresh queue box: writes left by earlier tests' fake clocks must not block this one.
+    final fresh = (await tester.runAsync(() => Hive.openBox<String>('sync_queue_add_player')))!;
+    await pumpApp(tester, queueBox: fresh);
+    await signIn(tester, 'manager@nascon.test', 'Nascon@26');
+    await tester.tap(find.text('Club').last);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Manage'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Manage'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Add player'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).first, 'New Signing');
+    await tester.tap(find.text('Other…'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).last, 'fw');
+    await tester.ensureVisible(find.text('Review new player'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Review new player'));
+    await tester.pumpAndSettle();
+    expect(find.text('Add New Signing to Alpha Falcons FC?'), findsOneWidget);
+    await tester.tap(find.text('Add player').last);
+    for (var i = 0; i < 40 && find.text('Applied: Add New Signing to Alpha Falcons FC').evaluate().isEmpty; i++) {
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 100)));
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(find.text('Applied: Add New Signing to Alpha Falcons FC'), findsOneWidget);
     await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 1700)));
     await tester.pump(const Duration(seconds: 5));
   });

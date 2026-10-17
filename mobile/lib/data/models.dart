@@ -319,6 +319,7 @@ class ClubProfile {
     required this.roster,
     required this.staff,
     required this.canManage,
+    this.positions = const [],
     this.rank,
     this.played,
     this.points,
@@ -336,6 +337,9 @@ class ClubProfile {
   final List<RosterPlayer> roster;
   final List<StaffMember> staff;
   final bool canManage;
+
+  /// Required positions from the sport/league roster rules (e.g. gk).
+  final List<String> positions;
   final int? rank;
   final int? played;
   final int? points;
@@ -359,6 +363,7 @@ class ClubProfile {
       roster: _list(j['roster']).map(RosterPlayer.fromJson).toList(),
       staff: _list(j['staff']).map((s) => StaffMember(name: _str(s['name']), role: _str(s['role']))).toList(),
       canManage: j['can_manage'] == true,
+      positions: ((j['positions'] as List?) ?? const []).whereType<String>().toList(),
       rank: stats == null ? null : _int(stats['rank']),
       played: stats == null ? null : _int(stats['played']),
       points: stats == null ? null : _int(stats['points']),

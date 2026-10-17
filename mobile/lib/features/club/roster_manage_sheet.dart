@@ -10,6 +10,7 @@ import '../../core/widgets/app_text_field.dart';
 import '../../core/widgets/confirm_sheet.dart';
 import '../../data/models.dart';
 import '../../data/providers.dart';
+import 'add_player_sheet.dart';
 
 enum RosterAction { transfer, loan, release }
 
@@ -179,7 +180,24 @@ class _RosterManageSheetState extends ConsumerState<RosterManageSheet> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Semantics(header: true, child: Text('Manage ${widget.club.name}', style: text.titleLarge)),
+                  const SizedBox(height: AppSpace.md),
+                  AppButton(
+                    id: 'roster_add_player',
+                    label: 'Add player',
+                    icon: Icons.person_add_alt,
+                    variant: AppButtonVariant.secondary,
+                    onPressed: _busy
+                        ? null
+                        : () {
+                            final nav = Navigator.of(context);
+                            final ctx = nav.context;
+                            nav.pop();
+                            showAddPlayerSheet(ctx, widget.club);
+                          },
+                  ),
                   const SizedBox(height: AppSpace.lg),
+                  Text('Move a player', style: text.titleMedium),
+                  const SizedBox(height: AppSpace.md),
                   field(
                     'Player',
                     dropdown<RosterPlayer>(

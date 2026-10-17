@@ -34,7 +34,8 @@ class QueuedAction {
 
   final String actionId;
 
-  /// `score_event` or `roster_transfer`.
+  /// `score_event` or `roster_transfer` (sent through offline-sync), or `player_add` (sent to
+  /// `POST /api/v1/clubs/{club_id}/players`, idempotent through its request_id).
   final String type;
   final String queuedAt;
   final int baseVersion;
@@ -167,10 +168,33 @@ class SyncQueue extends Notifier<SyncQueueState> {
   /// Sends every pending action. Applied and duplicate results leave the queue; rejected ones stay
   /// with their reason until the user dismisses them.
   Future<void> flush() async {
-    final pending = state.items.where((a) => a.status == QueuedStatus.pending).take(100).toList();
-    if (pending.isEmpty || state.syncing) return;
+    final all = state.items.where((a) => a.status == QueuedStatus.pending).toList();
+    if (all.isEmpty || state.syncing) return;
     state = state.copyWith(syncing: true, clearError: true);
+    final adds = all.where((a) => a.type == 'player_add').toList();
+    final pending = all.where((a) => a.type != 'player_add').take(100).toList();
     try {
+      for (final a in adds) {
+        try {
+          await ref.read(apiClientProvider).post(
+                '/api/v1/clubs/${Uri.encodeComponent(a.payload['club_id'] as String)}/players',
+                body: a.payload['body'],
+              );
+          await _box.delete(a.actionId);
+          _replace(a.withStatus(QueuedStatus.applied));
+          _clearLater([a.actionId]);
+        } on ApiException catch (e) {
+          if (e.isNetwork) rethrow;
+          final updated = a.withStatus(QueuedStatus.rejected, e.code);
+          await _box.put(a.actionId, jsonEncode(updated.toJson()));
+          _replace(updated);
+        }
+        _refreshAffected([a]);
+      }
+      if (pending.isEmpty) {
+        state = state.copyWith(syncing: false);
+        return;
+      }
       final res = await ref.read(apiClientProvider).post(
             '/audit/v1/offline-sync',
             body: {
@@ -200,16 +224,23 @@ class SyncQueue extends Notifier<SyncQueueState> {
         }
       }
       _refreshAffected(pending);
-      if (applied.isNotEmpty) {
-        Future<void>.delayed(const Duration(milliseconds: 1500), () {
-          if (!ref.mounted) return;
-          state = state.copyWith(items: state.items.where((a) => !applied.contains(a.actionId)).toList());
-        });
-      }
+      _clearLater(applied);
       state = state.copyWith(items: next, syncing: false);
     } on ApiException catch (e) {
       state = state.copyWith(syncing: false, lastError: e.message);
     }
+  }
+
+  void _replace(QueuedAction a) =>
+      state = state.copyWith(items: [for (final x in state.items) x.actionId == a.actionId ? a : x]);
+
+  /// Applied actions show "Applied" for a moment, then leave the list.
+  void _clearLater(List<String> ids) {
+    if (ids.isEmpty) return;
+    Future<void>.delayed(const Duration(milliseconds: 1500), () {
+      if (!ref.mounted) return;
+      state = state.copyWith(items: state.items.where((a) => !ids.contains(a.actionId)).toList());
+    });
   }
 
   /// Refetches the screens whose data the synced actions touched.
@@ -221,7 +252,7 @@ class SyncQueue extends Notifier<SyncQueueState> {
         ref.invalidate(fixturesProvider);
         ref.invalidate(standingsProvider);
       } else {
-        for (final k in ['from_squad_id', 'to_squad_id']) {
+        for (final k in ['from_squad_id', 'to_squad_id', 'club_id']) {
           final club = a.payload[k];
           if (club is String) ref.invalidate(clubProvider(club));
         }
