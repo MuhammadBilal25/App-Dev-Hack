@@ -19,14 +19,7 @@ class RoleBadge extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: AppSpace.sm, vertical: 3),
         decoration: BoxDecoration(color: scheme.primaryContainer, borderRadius: BorderRadius.circular(AppRadius.sm)),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.badge_outlined, size: 14, color: scheme.onPrimaryContainer),
-            const SizedBox(width: AppSpace.xs),
-            Text(role.label, style: Theme.of(context).textTheme.labelSmall!.copyWith(color: scheme.onPrimaryContainer)),
-          ],
-        ),
+        child: Text(role.label, style: Theme.of(context).textTheme.labelSmall!.copyWith(color: scheme.onPrimaryContainer)),
       ),
     );
   }

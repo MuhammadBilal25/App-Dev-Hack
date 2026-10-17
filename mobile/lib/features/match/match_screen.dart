@@ -411,8 +411,6 @@ class _TimelineRow extends ConsumerWidget {
                 width: 44,
                 child: Text(minute, style: text.titleMedium!.copyWith(fontFeatures: AppFonts.tabular, decoration: strike, color: e.compensated ? muted : null)),
               ),
-              Icon(_icon(e.type), size: 20, color: e.compensated ? muted : Theme.of(context).colorScheme.primary),
-              const SizedBox(width: AppSpace.md),
               Expanded(
                 child: Text(
                   what,
@@ -437,14 +435,6 @@ class _TimelineRow extends ConsumerWidget {
     );
   }
 
-  static IconData _icon(String type) => switch (type) {
-        'score' => Icons.sports_soccer,
-        'discipline' => Icons.style_outlined,
-        'match_start' => Icons.play_arrow_rounded,
-        'match_end' => Icons.flag_outlined,
-        'tiebreak_winner' => Icons.emoji_events_outlined,
-        _ => Icons.circle_outlined,
-      };
 }
 
 /// Score entry for the league organizer: team toggle, then one button per scoring event in the

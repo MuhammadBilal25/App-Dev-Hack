@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
-import '../../core/brand/club_crest.dart';
 import '../../core/layout/page_body.dart';
 import '../../core/theme/status_colors.dart';
 import '../../core/theme/tokens.dart';
@@ -11,7 +10,6 @@ import '../../core/theme/typography.dart';
 import '../../core/widgets/async_view.dart';
 import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/live_dot.dart';
-import '../../core/widgets/status_chip.dart';
 import '../../data/models.dart';
 import '../../data/providers.dart';
 import '../shell/tab_page.dart';
@@ -212,8 +210,7 @@ class FixtureRow extends StatelessWidget {
             child: Row(
               children: [
                 SizedBox(width: 72, child: _StatusColumn(fixture: f)),
-                Container(width: 1, height: 44, color: Theme.of(context).colorScheme.outlineVariant),
-                const SizedBox(width: AppSpace.md),
+                const SizedBox(width: AppSpace.sm),
                 Expanded(
                   child: Column(
                     children: [
@@ -255,14 +252,31 @@ class _StatusColumn extends StatelessWidget {
             Text("${fixture.minute ?? ''}'", style: text.bodyMedium!.copyWith(color: live, fontWeight: FontWeight.w800, fontFeatures: AppFonts.tabular)),
           ],
         ),
-      MatchStatus.completed => Text('FT', style: text.labelLarge!.copyWith(color: muted)),
-      MatchStatus.postponed => const Align(
-          alignment: Alignment.centerLeft,
-          child: StatusChip(kind: StatusKind.warning, label: 'PPD', icon: Icons.event_busy),
+      MatchStatus.completed => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('FT', style: text.labelSmall!.copyWith(color: muted)),
+            Text('Done', style: text.labelSmall!.copyWith(color: muted, fontWeight: FontWeight.w500)),
+          ],
         ),
-      MatchStatus.upcoming => Text(
-          DateFormat.Hm().format(fixture.kickoff),
-          style: text.bodyMedium!.copyWith(fontWeight: FontWeight.w700, fontFeatures: AppFonts.tabular),
+      MatchStatus.postponed => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(color: context.status.warning.bg, borderRadius: BorderRadius.circular(AppRadius.sm)),
+              child: Text('PPD', style: text.labelSmall!.copyWith(color: context.status.warning.fg)),
+            ),
+            const SizedBox(height: 2),
+            Text('Postponed', style: text.labelSmall!.copyWith(color: muted, fontWeight: FontWeight.w500)),
+          ],
+        ),
+      MatchStatus.upcoming => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(DateFormat.Hm().format(fixture.kickoff), style: text.bodyMedium!.copyWith(fontWeight: FontWeight.w800, fontFeatures: AppFonts.tabular)),
+            Text('Upcoming', style: text.labelSmall!.copyWith(color: muted, fontWeight: FontWeight.w500)),
+          ],
         ),
     };
   }
@@ -284,8 +298,6 @@ class _TeamLine extends StatelessWidget {
     final weight = winner || fixture.status == MatchStatus.live ? FontWeight.w800 : FontWeight.w500;
     return Row(
       children: [
-        ClubCrest(name: team.name, size: 24),
-        const SizedBox(width: AppSpace.sm),
         Expanded(
           child: Text(team.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: text.bodyLarge!.copyWith(color: color, fontWeight: weight)),
         ),
