@@ -6,3 +6,4 @@ coverage/
 mobile/build/
 mobile/.dart_tool/
 *.pdf
+.idea/

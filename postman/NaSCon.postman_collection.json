@@ -1,0 +1,1292 @@
+{
+  "info": {
+    "name": "NaSCon 26 - Backend",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Run folders top to bottom. The expected status code is in each request name."
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Setup",
+      "item": [
+        {
+          "name": "Health -> 200",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "Expect {\"status\":\"ok\"}"
+          }
+        },
+        {
+          "name": "Reset (default) -> 200",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/reset",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "reset"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "description": "Wipes and re-seeds. Stock M=1, L=5."
+          }
+        },
+        {
+          "name": "Reset (custom seed/stock) -> 200",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/reset",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "reset"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"seed\": 7,\n  \"stock\": {\n    \"var-jersey-001-M\": 3\n  }\n}"
+            },
+            "description": "Stock echo shows M=3."
+          }
+        },
+        {
+          "name": "Reset (bad seed) -> 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/reset",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "reset"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"seed\": \"abc\"\n}"
+            },
+            "description": "VALIDATION_ERROR, fields [seed]"
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Sports",
+      "item": [
+        {
+          "name": "Create mystery sport kabaddi -> 201",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/sports",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "sports"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sport_id\": \"kabaddi\",\n  \"name\": \"Kabaddi\",\n  \"scoring_model\": \"event\",\n  \"periods\": {\n    \"count\": 2,\n    \"duration_minutes\": 20\n  },\n  \"scoring_events\": {\n    \"raid_point\": {\n      \"points\": 1\n    },\n    \"tackle_point\": {\n      \"points\": 1\n    },\n    \"all_out\": {\n      \"points\": 2\n    }\n  },\n  \"draw_allowed\": false,\n  \"overtime\": {\n    \"policy\": \"golden_score\",\n    \"duration_minutes\": 5\n  },\n  \"tie_break_order\": [\n    \"h2h_points\",\n    \"h2h_diff\",\n    \"overall_diff\",\n    \"scored\",\n    \"fair_play\",\n    \"draw_lots\"\n  ],\n  \"roster\": {\n    \"min_squad_size\": 7,\n    \"max_squad_size\": 12,\n    \"required_positions\": {\n      \"raider\": 2,\n      \"defender\": 3\n    }\n  }\n}"
+            },
+            "description": "Send twice: second time -> 409 SPORT_EXISTS"
+          }
+        },
+        {
+          "name": "SQL injection sport_id -> 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/sports",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "sports"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sport_id\": \"x'; DROP TABLE sports;--\"\n}"
+            },
+            "description": "Never 5xx."
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. League + football match",
+      "item": [
+        {
+          "name": "Register league lg-1 -> 201",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/leagues",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "leagues"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"league_id\": \"lg-1\",\n  \"sport_id\": \"football\",\n  \"teams\": [\n    \"t1\",\n    \"t2\",\n    \"t3\",\n    \"t4\"\n  ],\n  \"fixtures\": [\n    {\n      \"match_id\": \"m1\",\n      \"home\": \"t1\",\n      \"away\": \"t2\"\n    },\n    {\n      \"match_id\": \"m2\",\n      \"home\": \"t3\",\n      \"away\": \"t4\"\n    }\n  ],\n  \"points\": {\n    \"win\": 3,\n    \"draw\": 1,\n    \"loss\": 0\n  },\n  \"qualification\": {\n    \"spots\": 2\n  },\n  \"lots_seed\": 42\n}"
+            },
+            "description": "Second time -> 409 LEAGUE_EXISTS"
+          }
+        },
+        {
+          "name": "Goal before start -> 409 MATCH_NOT_IN_PROGRESS",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/events",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "events"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event_id\": \"evt-0\",\n  \"match_id\": \"m1\",\n  \"type\": \"score\",\n  \"payload\": {\n    \"team_id\": \"t1\",\n    \"event_type\": \"goal\"\n  }\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Start match -> 201",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/events",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "events"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event_id\": \"evt-1\",\n  \"match_id\": \"m1\",\n  \"type\": \"match_start\",\n  \"payload\": {}\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Goal t1 -> 201",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/events",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "events"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event_id\": \"evt-2\",\n  \"match_id\": \"m1\",\n  \"type\": \"score\",\n  \"payload\": {\n    \"team_id\": \"t1\",\n    \"event_type\": \"goal\"\n  }\n}"
+            },
+            "description": "Send again unchanged -> 200 (idempotent replay)"
+          }
+        },
+        {
+          "name": "Same event_id, different body -> 409 DUPLICATE_EVENT_ID",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/events",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "events"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event_id\": \"evt-2\",\n  \"match_id\": \"m1\",\n  \"type\": \"score\",\n  \"payload\": {\n    \"team_id\": \"t2\",\n    \"event_type\": \"goal\"\n  }\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Unknown event type -> 400 UNKNOWN_EVENT_TYPE",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/events",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "events"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event_id\": \"evt-x\",\n  \"match_id\": \"m1\",\n  \"type\": \"score\",\n  \"payload\": {\n    \"team_id\": \"t1\",\n    \"event_type\": \"touchdown\"\n  }\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Goal t2 -> 201",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/events",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "events"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event_id\": \"evt-3\",\n  \"match_id\": \"m1\",\n  \"type\": \"score\",\n  \"payload\": {\n    \"team_id\": \"t2\",\n    \"event_type\": \"goal\"\n  }\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Compensate (disallow) evt-3 -> 201",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/events",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "events"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event_id\": \"evt-4\",\n  \"match_id\": \"m1\",\n  \"type\": \"compensation\",\n  \"payload\": {\n    \"compensates\": \"evt-3\",\n    \"reason\": \"Offside\"\n  }\n}"
+            },
+            "description": "Again -> 409 INVALID_COMPENSATION"
+          }
+        },
+        {
+          "name": "Yellow card t2 (fair play -1) -> 201",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/events",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "events"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event_id\": \"evt-5\",\n  \"match_id\": \"m1\",\n  \"type\": \"discipline\",\n  \"payload\": {\n    \"team_id\": \"t2\",\n    \"points\": -1\n  }\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "End match -> 201",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/events",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "events"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event_id\": \"evt-6\",\n  \"match_id\": \"m1\",\n  \"type\": \"match_end\",\n  \"payload\": {}\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Score m1 -> 200 (t1 1-0, evt-3 compensated)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/score/m1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "score",
+                "m1"
+              ]
+            },
+            "description": "status completed, outcome home_win, version 6"
+          }
+        },
+        {
+          "name": "Score unknown -> 404 MATCH_NOT_FOUND",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/score/nope",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "score",
+                "nope"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Basketball tie rules",
+      "item": [
+        {
+          "name": "Init stand-alone match b1 -> 201",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/events",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "events"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event_id\": \"b-1\",\n  \"match_id\": \"b1\",\n  \"type\": \"match_init\",\n  \"payload\": {\n    \"sport_id\": \"basketball\",\n    \"home_team_id\": \"h1\",\n    \"away_team_id\": \"a1\"\n  }\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Start b1 -> 201",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/events",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "events"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event_id\": \"b-2\",\n  \"match_id\": \"b1\",\n  \"type\": \"match_start\",\n  \"payload\": {}\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "End while level -> 409 TIE_NOT_ALLOWED",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/events",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "events"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event_id\": \"b-3\",\n  \"match_id\": \"b1\",\n  \"type\": \"match_end\",\n  \"payload\": {}\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Three pointer h1 -> 201",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/events",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "events"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event_id\": \"b-4\",\n  \"match_id\": \"b1\",\n  \"type\": \"score\",\n  \"payload\": {\n    \"team_id\": \"h1\",\n    \"event_type\": \"three_pointer\"\n  }\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "End b1 -> 201",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/events",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "events"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event_id\": \"b-5\",\n  \"match_id\": \"b1\",\n  \"type\": \"match_end\",\n  \"payload\": {}\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Score b1 -> 200 (3-0 home_win)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/score/b1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "score",
+                "b1"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Store checkout",
+      "item": [
+        {
+          "name": "Reset with stock M=1 -> 200",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/reset",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "reset"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stock\": {\n    \"var-jersey-001-M\": 1,\n    \"var-jersey-001-L\": 5\n  }\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Buy last M jersey -> 201 (receipt + pdf_base64)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/checkout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "checkout"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_id\": \"ord-001\",\n  \"customer_id\": \"cust-001\",\n  \"items\": [\n    {\n      \"variant_id\": \"var-jersey-001-M\",\n      \"quantity\": 1\n    }\n  ],\n  \"discount_code\": null,\n  \"payment\": {\n    \"token\": \"tok_success\"\n  }\n}"
+            },
+            "description": "Send again unchanged -> 200 replay"
+          }
+        },
+        {
+          "name": "Second buyer, no stock -> 409 OUT_OF_STOCK",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/checkout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "checkout"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_id\": \"ord-002\",\n  \"customer_id\": \"cust-001\",\n  \"items\": [\n    {\n      \"variant_id\": \"var-jersey-001-M\",\n      \"quantity\": 1\n    }\n  ],\n  \"discount_code\": null,\n  \"payment\": {\n    \"token\": \"tok_success\"\n  }\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Inventory M -> 200 stock 0 reserved 0",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/inventory/var-jersey-001-M",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "inventory",
+                "var-jersey-001-M"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Declined card -> 402 PAYMENT_DECLINED",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/checkout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "checkout"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_id\": \"ord-003\",\n  \"customer_id\": \"cust-001\",\n  \"items\": [\n    {\n      \"variant_id\": \"var-jersey-001-L\",\n      \"quantity\": 1\n    }\n  ],\n  \"discount_code\": null,\n  \"payment\": {\n    \"token\": \"tok_declined\"\n  }\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Capture fails -> 402 PAYMENT_CAPTURE_FAILED",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/checkout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "checkout"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_id\": \"ord-004\",\n  \"customer_id\": \"cust-001\",\n  \"items\": [\n    {\n      \"variant_id\": \"var-jersey-001-L\",\n      \"quantity\": 1\n    }\n  ],\n  \"discount_code\": null,\n  \"payment\": {\n    \"token\": \"tok_capture_fail\"\n  }\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Inventory L -> 200 stock still 5",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/inventory/var-jersey-001-L",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "inventory",
+                "var-jersey-001-L"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "WELCOME10 discount -> 201 (discount 45000)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/checkout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "checkout"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_id\": \"ord-005\",\n  \"customer_id\": \"cust-001\",\n  \"items\": [\n    {\n      \"variant_id\": \"var-jersey-001-L\",\n      \"quantity\": 1\n    }\n  ],\n  \"discount_code\": \"WELCOME10\",\n  \"payment\": {\n    \"token\": \"tok_success\"\n  }\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Bad discount -> 400 INVALID_DISCOUNT_CODE",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/checkout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "checkout"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_id\": \"ord-006\",\n  \"customer_id\": \"cust-001\",\n  \"items\": [\n    {\n      \"variant_id\": \"var-jersey-001-L\",\n      \"quantity\": 1\n    }\n  ],\n  \"discount_code\": \"FREE\",\n  \"payment\": {\n    \"token\": \"tok_success\"\n  }\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Unknown variant -> 404 VARIANT_NOT_FOUND",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/checkout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "checkout"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_id\": \"ord-007\",\n  \"customer_id\": \"cust-001\",\n  \"items\": [\n    {\n      \"variant_id\": \"nope\",\n      \"quantity\": 1\n    }\n  ],\n  \"discount_code\": null,\n  \"payment\": {\n    \"token\": \"tok_success\"\n  }\n}"
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. RBAC + security",
+      "item": [
+        {
+          "name": "Get JWTs for 5 roles -> 200 (saves tokens)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/rbac-matrix",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "rbac-matrix"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const t = pm.response.json().tokens;",
+                  "Object.keys(t).forEach(k => pm.collectionVariables.set(k, t[k]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "P7 platform config as super_admin -> 200",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{super_admin}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/rbac/platform/config",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "rbac",
+                "platform",
+                "config"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "P7 platform config as viewer -> 403",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{viewer}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/rbac/platform/config",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "rbac",
+                "platform",
+                "config"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "P7 with no token -> 401",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/rbac/platform/config",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "rbac",
+                "platform",
+                "config"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "P2 own league as organizer -> 200",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{league_organizer}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/rbac/leagues/league-alpha-1/fixtures",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "rbac",
+                "leagues",
+                "league-alpha-1",
+                "fixtures"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "P2 other league as organizer -> 403",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{league_organizer}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/rbac/leagues/league-alpha-2/fixtures",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "rbac",
+                "leagues",
+                "league-alpha-2",
+                "fixtures"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "P3 own club roster as manager -> 200",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{club_manager}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/rbac/clubs/club-alpha-1/roster",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "rbac",
+                "clubs",
+                "club-alpha-1",
+                "roster"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "P6 foreign club as player -> 403",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{player}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/rbac/clubs/club-beta-1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "rbac",
+                "clubs",
+                "club-beta-1"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "P5 self as player -> 200",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{player}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/rbac/players/player-alpha-1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "rbac",
+                "players",
+                "player-alpha-1"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Login as manager -> 200 token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"manager@nascon.test\",\n  \"password\": \"Nascon@26\"\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Login wrong password -> 401",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"manager@nascon.test\",\n  \"password\": \"nope\"\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Ping (rate limited 100/10s) -> 200",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ping",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ping"
+              ]
+            },
+            "description": "Use the Runner with 150 iterations to see 429 RATE_LIMITED"
+          }
+        }
+      ]
+    }
+  ]
+}
