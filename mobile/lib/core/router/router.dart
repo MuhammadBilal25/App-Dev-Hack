@@ -5,11 +5,14 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/login_screen.dart';
 import '../../features/club/club_screen.dart';
 import '../../features/fixtures/fixtures_screen.dart';
+import '../../features/match/match_screen.dart';
 import '../../features/profile/profile_screen.dart';
 import '../../features/shell/app_shell.dart';
 import '../../features/splash/splash_screen.dart';
 import '../../features/standings/standings_screen.dart';
+import '../../features/store/receipt_screen.dart';
 import '../../features/store/store_screen.dart';
+import '../../data/models.dart';
 import '../../features/sync/sync_queue_screen.dart';
 import '../auth/auth_controller.dart';
 
@@ -46,6 +49,19 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: Routes.splash, builder: (_, _) => const SplashScreen()),
       GoRoute(path: Routes.login, builder: (_, _) => const LoginScreen()),
       GoRoute(path: Routes.sync, builder: (_, _) => const SyncQueueScreen()),
+      GoRoute(path: '/match/:id', builder: (_, state) => MatchScreen(matchId: state.pathParameters['id']!)),
+      GoRoute(
+        path: '/receipt',
+        redirect: (_, state) => state.extra is Map ? null : Routes.store,
+        builder: (_, state) {
+          final extra = state.extra as Map;
+          return ReceiptScreen(
+            order: Map<String, dynamic>.from(extra['order'] as Map),
+            product: extra['product'] as Product?,
+            variant: extra['variant'] as Variant?,
+          );
+        },
+      ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, shell) => AppShell(shell: shell),
         branches: [

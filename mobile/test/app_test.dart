@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -11,6 +12,8 @@ import 'package:huddle/app.dart';
 import 'package:huddle/core/api/api_client.dart';
 import 'package:huddle/core/auth/token_store.dart';
 import 'package:huddle/core/auth/user.dart';
+import 'package:huddle/core/cache/api_cache.dart';
+import 'package:huddle/features/match/match_screen.dart';
 import 'package:huddle/core/connectivity/connectivity.dart';
 import 'package:huddle/core/copy/error_messages.dart';
 import 'package:huddle/core/settings/settings.dart';
@@ -90,18 +93,116 @@ http.Client fakeBackend() => MockClient((req) async {
         );
       }
       if (req.url.path == '/api/v1/ping') return http.Response('{"pong":true}', 200);
+      final canned = demoApi[req.url.path];
+      if (canned != null) return http.Response(jsonEncode(canned), 200);
       return http.Response(jsonEncode({'error': {'code': 'NOT_FOUND', 'message': 'x', 'details': {}}}), 404);
     });
 
+final _now = DateTime.now().toUtc();
+String _at(Duration d) => _now.add(d).toIso8601String();
+
+Map<String, dynamic> _fixture(String id, String status, int hs, int as, Duration at, {String? winner, int? minute}) => {
+      'match_id': id,
+      'league_id': 'league-alpha-1',
+      'league_name': 'Alpha Premier League',
+      'sport_id': 'football',
+      'round': 2,
+      'kickoff_at': _at(at),
+      'venue': 'Falcon Ground',
+      'status': status,
+      'minute': minute,
+      'winner_team_id': winner,
+      'home': {'team_id': 'club-alpha-1', 'name': 'Alpha Falcons FC', 'score': hs},
+      'away': {'team_id': 'club-alpha-3', 'name': 'Alpha Rovers', 'score': as},
+    };
+
+final _jersey = {
+  'product_id': 'prod-jersey-001',
+  'name': 'Alpha Falcons Home Jersey',
+  'category': 'apparel',
+  'description': 'Official 2026 home jersey.',
+  'club_name': 'Alpha Falcons FC',
+  'variants': [
+    {'variant_id': 'var-jersey-001-M', 'size': 'M', 'color': 'blue', 'price_minor': 450000, 'stock': 1},
+    {'variant_id': 'var-jersey-001-L', 'size': 'L', 'color': 'blue', 'price_minor': 450000, 'stock': 5},
+  ],
+};
+
+/// Canned `/api/v1` responses shaped like the backend's demo seed.
+final Map<String, Object> demoApi = {
+  '/api/v1/fixtures': {
+    'fixtures': [
+      _fixture('demo-done', 'completed', 2, 1, const Duration(days: -2), winner: 'club-alpha-1'),
+      _fixture('demo-live', 'in_progress', 2, 1, const Duration(minutes: -67), minute: 67),
+      _fixture('demo-next', 'upcoming', 0, 0, const Duration(days: 7)),
+    ],
+  },
+  '/api/v1/matches/demo-live': {
+    ..._fixture('demo-live', 'in_progress', 2, 1, const Duration(minutes: -67), minute: 67),
+    'sport_name': 'Football',
+    'can_score': false,
+    'timeline': [
+      {'event_id': 'e1', 'type': 'match_start', 'label': 'Kick-off', 'compensated': false},
+      {'event_id': 'e2', 'type': 'score', 'label': 'Goal', 'minute': 9, 'team_name': 'Alpha Falcons FC', 'compensated': false},
+      {'event_id': 'e3', 'type': 'score', 'label': 'Goal', 'minute': 23, 'team_name': 'Alpha Rovers', 'compensated': true},
+    ],
+    'pinned_product': _jersey,
+  },
+  '/api/v1/leagues': {
+    'leagues': [
+      {'league_id': 'league-alpha-1', 'name': 'Alpha Premier League', 'sport_name': 'Football', 'fixture_count': 6},
+    ],
+  },
+  '/api/v1/standings/league-alpha-1': {
+    'league_id': 'league-alpha-1',
+    'league_name': 'Alpha Premier League',
+    'qualification_spots': 2,
+    'table': [
+      for (final (i, t) in ['Alpha Falcons FC', 'Alpha Rovers', 'Alpha United', 'Alpha Lions FC'].indexed)
+        {'rank': i + 1, 'team_id': 'c$i', 'team_name': t, 'played': 1, 'diff': 1 - i, 'points': 3 - i, 'status': i == 3 ? 'eliminated' : 'still_possible'},
+    ],
+  },
+  '/api/v1/clubs': {
+    'clubs': [
+      {'club_id': 'club-alpha-1', 'name': 'Alpha Falcons FC'},
+    ],
+  },
+  '/api/v1/clubs/club-alpha-1': {
+    'club_id': 'club-alpha-1',
+    'name': 'Alpha Falcons FC',
+    'sport_name': 'Football',
+    'league_name': 'Alpha Premier League',
+    'venue': {'name': 'Falcon Ground', 'lat': 33.6844, 'lng': 73.0479},
+    'social': {'x': '@alphafalcons'},
+    'staff': [
+      {'name': 'Imran Qureshi', 'role': 'coach'},
+    ],
+    'roster': [
+      {'player_id': 'p1', 'name': 'Ali Raza', 'position': 'gk', 'role': 'captain', 'shirt': 1},
+      {'player_id': 'p2', 'name': 'Zain Khan', 'position': 'df', 'role': 'vice_captain', 'shirt': 2},
+    ],
+    'stats': {'rank': 1, 'played': 1, 'points': 3},
+    'can_manage': true,
+  },
+  '/api/v1/catalogue': {
+    'products': [_jersey],
+  },
+};
+
 void main() {
   late Box<String> box;
+  late Box<String> cache;
 
   setUpAll(() async {
     Hive.init(Directory.systemTemp.createTempSync('huddle_test').path);
     box = await Hive.openBox<String>(syncBoxName);
+    cache = await Hive.openBox<String>(cacheBoxName);
   });
 
   Future<void> pumpApp(WidgetTester tester) async {
+    // The LIVE dot pulses forever; with animations off it is static, so pumpAndSettle can settle.
+    tester.platformDispatcher.accessibilityFeaturesTestValue = const FakeAccessibilityFeatures(disableAnimations: true);
+    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
     SharedPreferences.setMockInitialValues({});
     final prefs = await SharedPreferences.getInstance();
     await tester.pumpWidget(
@@ -109,6 +210,11 @@ void main() {
         overrides: [
           sharedPrefsProvider.overrideWithValue(prefs),
           syncBoxProvider.overrideWithValue(box),
+          cacheBoxProvider.overrideWithValue(cache),
+          // SSE: a stream that stays open and silent.
+          sseClientFactoryProvider.overrideWithValue(
+            () => MockClient.streaming((req, _) async => http.StreamedResponse(StreamController<List<int>>().stream, 200)),
+          ),
           tokenStoreProvider.overrideWithValue(MemoryTokenStore()),
           httpClientProvider.overrideWithValue(fakeBackend()),
           deviceOnlineProvider.overrideWith((ref) => Stream.value(true)),
@@ -216,6 +322,101 @@ void main() {
       await tester.tap(find.text('Sign out').last);
       await tester.pumpAndSettle();
       expect(find.text('powered by'), findsOneWidget);
+    }
+  });
+
+  testWidgets('fixtures, match detail, standings, club and store render the demo data', (tester) async {
+    await pumpApp(tester);
+    await signIn(tester, 'manager@nascon.test', 'Nascon@26');
+
+    expect(find.textContaining('TODAY · '), findsOneWidget);
+    expect(find.text('FT'), findsOneWidget);
+    expect(find.text('LIVE'), findsWidgets);
+    await tester.tap(find.text('Results'));
+    await tester.pumpAndSettle();
+    expect(find.text('FT'), findsOneWidget);
+    expect(find.text('LIVE'), findsNothing);
+    await tester.tap(find.text('All'));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text("67'"));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text("67'"));
+    await tester.pumpAndSettle();
+    expect(find.text('2 : 1'), findsOneWidget);
+    expect(find.text("LIVE 67'"), findsOneWidget);
+    expect(find.text('Disallowed'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('Buy'), 200, scrollable: find.byType(Scrollable).first);
+    await tester.ensureVisible(find.text('Buy'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Buy'));
+    await tester.pumpAndSettle();
+    expect(find.text('Pay with mock card · PKR 4500.00'), findsOneWidget);
+    expect(find.text('Last one!'), findsOneWidget);
+    Navigator.of(tester.element(find.text('Pay with mock card · PKR 4500.00'))).pop();
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Standings').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Top 2 qualify for the playoffs'), findsOneWidget);
+    expect(find.text('Eliminated'), findsOneWidget);
+
+    await tester.tap(find.text('Club').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Football · @alphafalcons'), findsOneWidget);
+    expect(find.text('C'), findsOneWidget);
+    expect(find.text('VC'), findsOneWidget);
+    expect(find.text('Manage'), findsOneWidget);
+
+    await tester.tap(find.text('Store').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Alpha Falcons Home Jersey'), findsOneWidget);
+    expect(find.text('PKR 4500.00'), findsOneWidget);
+  });
+
+  testWidgets('every data screen fits 360x640 at 1.3x text and in landscape', (tester) async {
+    tester.view.devicePixelRatio = 3;
+    tester.platformDispatcher.textScaleFactorTestValue = 1.3;
+    addTearDown(tester.view.reset);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    for (final size in const [Size(1080, 1920), Size(1920, 1080)]) {
+      tester.view.physicalSize = size;
+      await pumpApp(tester);
+      await signIn(tester, 'manager@nascon.test', 'Nascon@26');
+      await tester.scrollUntilVisible(find.text("67'"), 150, scrollable: find.byType(Scrollable).first);
+      await tester.ensureVisible(find.text("67'"));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text("67'"));
+      await tester.pumpAndSettle();
+      expect(find.text('2 : 1'), findsOneWidget);
+      await tester.tap(find.text('Line-ups'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Back'));
+      await tester.pumpAndSettle();
+      for (final tab in ['Standings', 'Club', 'Store']) {
+        await tester.tap(find.text(tab).last);
+        await tester.pumpAndSettle();
+      }
+      await tester.ensureVisible(find.text('Alpha Falcons Home Jersey'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Alpha Falcons Home Jersey'));
+      await tester.pumpAndSettle();
+      expect(find.text('Pay with mock card · PKR 4500.00'), findsOneWidget);
+      Navigator.of(tester.element(find.text('Pay with mock card · PKR 4500.00'))).pop();
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Profile').last);
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(find.text('Sign out'), 200, scrollable: find.byType(Scrollable).first);
+      await tester.ensureVisible(find.text('Sign out'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Sign out'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Sign out').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Sign out').last);
+      await tester.pumpAndSettle();
     }
   });
 }

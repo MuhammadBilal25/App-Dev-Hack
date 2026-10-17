@@ -1,5 +1,15 @@
 # API needs: backend routes the mobile app is waiting for
 
+**Status (Step 1 done):** these now exist and the app uses them: `GET /api/v1/tenants/me`,
+`/leagues`, `/fixtures`, `/matches/{id}` (timeline + pinned product), `/standings/{league_id}`,
+`/clubs`, `/clubs/{id}`, `/catalogue`. Demo data for `league-alpha-1` is seeded on every reset.
+Checkout still goes through `POST /audit/v1/checkout`.
+
+**Still missing:** authenticated score entry (`POST /api/v1/matches/{id}/events`), roster actions
+(`POST /api/v1/roster/transfer`, seeded clubs set up as a roster league), authenticated offline sync
+(`POST /api/v1/sync`), `POST /api/v1/checkout` with the customer taken from the token, and
+`GET /api/v1/orders`. The original wish list follows for reference.
+
 The app uses these routes today: `POST /api/v1/auth/login`, `GET /api/v1/me`, `GET /api/v1/ping`,
 `GET /api/v1/stream` (SSE) and `POST /audit/v1/offline-sync` for the offline queue.
 
