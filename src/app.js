@@ -9,6 +9,7 @@ const sports = require('./services/sports');
 const scoring = require('./services/scoring');
 const leagues = require('./services/leagues');
 const fixtures = require('./services/fixtures');
+const standingsSvc = require('./services/standings');
 const realtime = require('./realtime');
 const store = require('./services/store');
 const roster = require('./services/roster');
@@ -41,6 +42,7 @@ function createApp() {
   app.post('/audit/v1/fixtures', (req, res) => send(res, fixtures.generate(req.body)));
   app.post('/audit/v1/leagues', (req, res) => send(res, leagues.registerLeague(req.body)));
   app.post('/audit/v1/events', (req, res) => send(res, scoring.appendEvent(req.body)));
+  app.get('/audit/v1/standings/:leagueId', (req, res) => res.status(200).json(standingsSvc.standings(req.params.leagueId)));
   app.get('/audit/v1/score/:matchId', (req, res) => res.status(200).json(scoring.getScore(req.params.matchId)));
 
   app.post('/audit/v1/roster/setup', (req, res) => send(res, roster.setup(req.body)));
