@@ -12,6 +12,7 @@ import '../../core/widgets/empty_state.dart';
 import '../../data/models.dart';
 import '../../data/providers.dart';
 import '../shell/tab_page.dart';
+import 'roster_manage_sheet.dart';
 
 /// Club tab: the user's own club by default, any club of the tenant via the chips.
 class ClubScreen extends ConsumerStatefulWidget {
@@ -183,30 +184,7 @@ class _ClubProfileViewState extends ConsumerState<_ClubProfileView> {
     );
   }
 
-  void _showManage(BuildContext context, ClubProfile c) {
-    showModalBottomSheet<void>(
-      context: context,
-      useSafeArea: true,
-      builder: (sheet) => Semantics(
-        identifier: 'club_manage_sheet',
-        container: true,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(AppSpace.xl, 0, AppSpace.xl, AppSpace.xl),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text('Manage ${c.name}', style: Theme.of(sheet).textTheme.titleLarge),
-              const SizedBox(height: AppSpace.sm),
-              Text('Transfers, loans and releases are not available in this version yet.', style: Theme.of(sheet).textTheme.bodyLarge),
-              const SizedBox(height: AppSpace.xl),
-              AppButton(id: 'club_manage_close', label: 'Close', variant: AppButtonVariant.secondary, onPressed: () => Navigator.of(sheet).pop()),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+  void _showManage(BuildContext context, ClubProfile c) => showRosterManageSheet(context, c);
 }
 
 class _Roster extends StatelessWidget {

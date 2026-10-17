@@ -11,6 +11,8 @@ import '../../core/auth/auth_controller.dart';
 import '../../core/brand/club_crest.dart';
 import '../../core/layout/page_body.dart';
 import '../../core/settings/settings.dart';
+import '../../core/sync/submit.dart';
+import '../../core/widgets/confirm_sheet.dart';
 import '../../core/theme/status_colors.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/theme/typography.dart';
@@ -117,6 +119,10 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         if (r.fromCache) const CachedNotice(),
+                        if (r.data.canScore && r.data.fixture.status == MatchStatus.live) ...[
+                          _ScorePanel(detail: r.data),
+                          const SizedBox(height: AppSpace.lg),
+                        ],
                         _Tabs(index: _tab, onChanged: (i) => setState(() => _tab = i)),
                         const SizedBox(height: AppSpace.md),
                         AnimatedSwitcher(
@@ -342,7 +348,7 @@ class _Timeline extends StatelessWidget {
         children: [
           for (var i = 0; i < events.length; i++) ...[
             if (i > 0) const Divider(),
-            _TimelineRow(event: events[i]),
+            _TimelineRow(event: events[i], detail: detail),
           ],
         ],
       ),
@@ -350,13 +356,41 @@ class _Timeline extends StatelessWidget {
   }
 }
 
-class _TimelineRow extends StatelessWidget {
-  const _TimelineRow({required this.event});
+class _TimelineRow extends ConsumerWidget {
+  const _TimelineRow({required this.event, required this.detail});
 
   final TimelineEvent event;
+  final MatchDetail detail;
+
+  Future<void> _correct(BuildContext context, WidgetRef ref, String what) async {
+    final r = await ConfirmSheet.show(
+      context,
+      id: 'confirm_correct',
+      title: 'Correct this event?',
+      message: '$what will be struck through and no longer count. The original stays in the record.',
+      confirmLabel: 'Correct',
+      variant: AppButtonVariant.destructive,
+      reasonLabel: 'Reason',
+    );
+    if (!r.confirmed || !context.mounted) return;
+    final f = detail.fixture;
+    await submitAction(
+      context,
+      ref,
+      type: 'score_event',
+      baseVersion: f.version,
+      label: 'Correct $what',
+      payload: {
+        'event_id': newClientId('ev'),
+        'match_id': f.id,
+        'type': 'compensation',
+        'payload': {'compensates': event.id, 'reason': r.reason},
+      },
+    );
+  }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final text = Theme.of(context).textTheme;
     final muted = Theme.of(context).colorScheme.onSurfaceVariant;
     final e = event;
@@ -366,7 +400,7 @@ class _TimelineRow extends StatelessWidget {
     return Semantics(
       identifier: 'timeline_${e.id}',
       label: '$minute $what${e.compensated ? ', disallowed' : ''}',
-      excludeSemantics: true,
+      excludeSemantics: !(detail.canScore && e.correctable),
       child: ConstrainedBox(
         constraints: const BoxConstraints(minHeight: AppSize.rowMin),
         child: Padding(
@@ -388,6 +422,14 @@ class _TimelineRow extends StatelessWidget {
                 ),
               ),
               if (e.compensated) const StatusChip(kind: StatusKind.neutral, label: 'Disallowed', icon: Icons.block),
+              if (detail.canScore && e.correctable)
+                Semantics(
+                  identifier: 'timeline_correct_${e.id}',
+                  button: true,
+                  label: 'Correct $what',
+                  excludeSemantics: true,
+                  child: TextButton(onPressed: () => _correct(context, ref, what), child: const Text('Correct')),
+                ),
             ],
           ),
         ),
@@ -403,6 +445,87 @@ class _TimelineRow extends StatelessWidget {
         'tiebreak_winner' => Icons.emoji_events_outlined,
         _ => Icons.circle_outlined,
       };
+}
+
+/// Score entry for the league organizer: team toggle, then one button per scoring event in the
+/// sport config. Each tap is confirmed, then queued as a `score_event` (base_version = match version).
+class _ScorePanel extends ConsumerStatefulWidget {
+  const _ScorePanel({required this.detail});
+
+  final MatchDetail detail;
+
+  @override
+  ConsumerState<_ScorePanel> createState() => _ScorePanelState();
+}
+
+class _ScorePanelState extends ConsumerState<_ScorePanel> {
+  bool _home = true;
+
+  Future<void> _add(String eventType) async {
+    final f = widget.detail.fixture;
+    final team = _home ? f.home : f.away;
+    final what = '${humanize(eventType)} for ${team.name}';
+    final r = await ConfirmSheet.show(
+      context,
+      id: 'confirm_score',
+      title: 'Add ${humanize(eventType).toLowerCase()}?',
+      message: '$what${f.minute == null ? '' : " at ${f.minute}'"}. You can correct it later from the timeline.',
+      confirmLabel: 'Add',
+    );
+    if (!r.confirmed || !mounted) return;
+    await submitAction(
+      context,
+      ref,
+      type: 'score_event',
+      baseVersion: f.version,
+      label: what,
+      payload: {
+        'event_id': newClientId('ev'),
+        'match_id': f.id,
+        'type': 'score',
+        'payload': {'team_id': team.id, 'event_type': eventType, 'minute': ?f.minute},
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final f = widget.detail.fixture;
+    final text = Theme.of(context).textTheme;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpace.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Semantics(header: true, child: Text('Score entry', style: text.titleMedium)),
+            const SizedBox(height: AppSpace.md),
+            Semantics(
+              identifier: 'score_team',
+              child: SegmentedButton<bool>(
+                segments: [
+                  ButtonSegment(value: true, label: Text(f.home.name, overflow: TextOverflow.ellipsis)),
+                  ButtonSegment(value: false, label: Text(f.away.name, overflow: TextOverflow.ellipsis)),
+                ],
+                selected: {_home},
+                showSelectedIcon: false,
+                onSelectionChanged: (s) => setState(() => _home = s.first),
+              ),
+            ),
+            const SizedBox(height: AppSpace.md),
+            Wrap(
+              spacing: AppSpace.sm,
+              runSpacing: AppSpace.sm,
+              children: [
+                for (final e in widget.detail.scoringEvents)
+                  AppButton(id: 'score_add_$e', label: '+ ${humanize(e)}', expand: false, onPressed: () => _add(e)),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _LineUps extends ConsumerWidget {

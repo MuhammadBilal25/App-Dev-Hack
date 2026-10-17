@@ -98,6 +98,7 @@ class _QueueRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
     final rejected = action.status == QueuedStatus.rejected;
+    final applied = action.status == QueuedStatus.applied;
     final queued = DateTime.tryParse(action.queuedAt)?.toLocal();
     return Semantics(
       identifier: 'sync_item_${action.actionId}',
@@ -115,7 +116,9 @@ class _QueueRow extends StatelessWidget {
                   const SizedBox(width: AppSpace.sm),
                   AnimatedSwitcher(
                     duration: AppMotion.of(context, AppMotion.medium),
-                    child: rejected
+                    child: applied
+                        ? const StatusChip(key: ValueKey('applied'), kind: StatusKind.success, label: 'Applied', icon: Icons.check)
+                        : rejected
                         ? const StatusChip(key: ValueKey('rejected'), kind: StatusKind.danger, label: 'Not applied', icon: Icons.close)
                         : syncing
                             ? const StatusChip(key: ValueKey('syncing'), kind: StatusKind.info, label: 'Syncing…', icon: Icons.sync)

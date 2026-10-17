@@ -1,5 +1,45 @@
 # NaSCon '26 — Multi-Sport League & Club Operations Platform
 
+## Quick start (backend + app)
+
+**1. Backend** (Docker):
+
+```bash
+cp .env.example .env                      # put your team salt in DAY1_SALT
+DAY1_SALT=<your-salt> docker compose up -d --build
+curl http://localhost:8080/health         # {"status":"ok"} once seeded
+curl -X POST http://localhost:8080/audit/v1/reset   # fresh demo data (do this just before judging)
+```
+
+**2. App** (Flutter 3.41.3 / Dart 3.11, Android):
+
+```bash
+cd mobile
+flutter pub get
+flutter run                               # or: flutter build apk --release
+```
+
+**3. Server address.** The app defaults to `http://localhost:8080`. On a real phone, open
+**Change server** on the login screen (or **Profile → Server address**) and enter the laptop's
+Wi-Fi address, e.g. `http://192.168.1.20:8080` (phone and laptop on the same network). With a USB
+cable you can keep `localhost` by running `adb reverse tcp:8080 tcp:8080`. The address is saved on
+the phone.
+
+**4. Sign in** with any demo account below (password `Nascon@26` for all). The login screen also
+has a **Demo accounts** list that fills them in.
+
+| Role | Email | What to try |
+|---|---|---|
+| Super Admin | `admin@nascon.test` | Sees every tenant |
+| League Organizer | `organizer@nascon.test` | Fixtures → live match → **Score entry**, **Correct** on a goal |
+| Club Manager | `manager@nascon.test` | Club → **Manage** → transfer / loan / release |
+| Player | `player@nascon.test` | Profile → My player profile |
+| Viewer | `viewer@nascon.test` | Read-only + Store checkout |
+
+Offline: score and roster changes are queued on the phone (they survive force-close), show as
+**Pending** on the Sync screen, and sync automatically on reconnect or with **Sync now**; each
+action then shows **Applied** or **Not applied** with the reason.
+
 Backend: Node.js 20 + Express 5, PostgreSQL 16, Redis 7 (cache, rate limiting and the domain-event stream).
 Mobile: Flutter (Android), in `mobile/`.
 
@@ -24,7 +64,7 @@ The API listens on host port **8080**. On startup it creates the schema and seed
 | `REDIS_URL` | set by compose | Redis connection string. |
 | `PORT` | set by compose | API port (8080). |
 
-## Demo accounts
+## Demo accounts (detail)
 
 All passwords: `Nascon@26`
 

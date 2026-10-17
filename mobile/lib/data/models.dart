@@ -50,6 +50,7 @@ class Fixture {
     required this.away,
     this.minute,
     this.winnerId,
+    this.version = 0,
   });
 
   final String id;
@@ -64,6 +65,9 @@ class Fixture {
   final TeamScore away;
   final int? minute;
   final String? winnerId;
+
+  /// Length of the match event log: the `base_version` for offline score actions.
+  final int version;
 
   bool get hasScore => status == MatchStatus.live || status == MatchStatus.completed;
 
@@ -80,6 +84,7 @@ class Fixture {
         away: TeamScore.fromJson(j['away'] as Map<String, dynamic>),
         minute: j['minute'] is num ? (j['minute'] as num).toInt() : null,
         winnerId: j['winner_team_id'] as String?,
+        version: _int(j['version']),
       );
 }
 
@@ -101,6 +106,9 @@ class TimelineEvent {
   final int? minute;
   final String? teamName;
   final String? reason;
+
+  /// Events a compensation may target (backend COMPENSABLE list).
+  bool get correctable => !compensated && (type == 'score' || type == 'discipline' || type == 'tiebreak_winner');
 
   factory TimelineEvent.fromJson(Map<String, dynamic> j) => TimelineEvent(
         id: _str(j['event_id']),
@@ -167,6 +175,7 @@ class MatchDetail {
     required this.sportName,
     required this.timeline,
     required this.canScore,
+    this.scoringEvents = const [],
     this.pinned,
   });
 
@@ -174,6 +183,9 @@ class MatchDetail {
   final String sportName;
   final List<TimelineEvent> timeline;
   final bool canScore;
+
+  /// Event types from the sport config, e.g. goal, or two_pointer and three_pointer.
+  final List<String> scoringEvents;
   final Product? pinned;
 
   factory MatchDetail.fromJson(Map<String, dynamic> j) => MatchDetail(
@@ -181,6 +193,7 @@ class MatchDetail {
         sportName: _str(j['sport_name']),
         timeline: _list(j['timeline']).map(TimelineEvent.fromJson).toList(),
         canScore: j['can_score'] == true,
+        scoringEvents: ((j['scoring_events'] as List?) ?? const []).whereType<String>().toList(),
         pinned: j['pinned_product'] is Map<String, dynamic> ? Product.fromJson(j['pinned_product'] as Map<String, dynamic>) : null,
       );
 }
@@ -254,13 +267,25 @@ class League {
 }
 
 class RosterPlayer {
-  const RosterPlayer({required this.id, required this.name, required this.position, required this.role, this.shirt});
+  const RosterPlayer({
+    required this.id,
+    required this.name,
+    required this.position,
+    required this.role,
+    this.shirt,
+    this.onLoan = false,
+    this.version = 0,
+  });
 
   final String id;
   final String name;
   final String position;
   final String role;
   final int? shirt;
+  final bool onLoan;
+
+  /// Audit entry count: the `base_version` for offline roster actions.
+  final int version;
 
   factory RosterPlayer.fromJson(Map<String, dynamic> j) => RosterPlayer(
         id: _str(j['player_id']),
@@ -268,6 +293,8 @@ class RosterPlayer {
         position: _str(j['position']),
         role: _str(j['role']),
         shirt: j['shirt'] is num ? (j['shirt'] as num).toInt() : null,
+        onLoan: j['on_loan'] == true,
+        version: _int(j['version']),
       );
 }
 
@@ -282,6 +309,7 @@ class ClubProfile {
   const ClubProfile({
     required this.id,
     required this.name,
+    required this.leagueId,
     required this.sportName,
     required this.leagueName,
     required this.venueName,
@@ -298,6 +326,7 @@ class ClubProfile {
 
   final String id;
   final String name;
+  final String leagueId;
   final String sportName;
   final String leagueName;
   final String venueName;
@@ -320,6 +349,7 @@ class ClubProfile {
     return ClubProfile(
       id: _str(j['club_id']),
       name: _str(j['name']),
+      leagueId: _str(j['league_id']),
       sportName: _str(j['sport_name']),
       leagueName: _str(j['league_name']),
       venueName: _str(venue['name']),
@@ -345,3 +375,9 @@ class ClubRef {
 
 /// `PKR 4500.00`: minor units ÷ 100, two decimals, no thousands separator (UI.md §6.8).
 String formatPrice(int minor, [String currency = 'PKR']) => '$currency ${(minor / 100).toStringAsFixed(2)}';
+
+/// "two_pointer" -> "Two pointer": event names come from the sport config, never hard-coded.
+String humanize(String key) {
+  final s = key.replaceAll('_', ' ').trim();
+  return s.isEmpty ? key : s[0].toUpperCase() + s.substring(1);
+}

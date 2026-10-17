@@ -93,6 +93,21 @@ http.Client fakeBackend() => MockClient((req) async {
         );
       }
       if (req.url.path == '/api/v1/ping') return http.Response('{"pong":true}', 200);
+      if (req.url.path == '/audit/v1/offline-sync') {
+        final b = jsonDecode(req.body) as Map<String, dynamic>;
+        final actions = (b['actions'] as List).cast<Map<String, dynamic>>();
+        return http.Response(
+          jsonEncode({
+            'device_id': b['device_id'],
+            'results': [
+              for (final a in actions)
+                {'action_id': a['action_id'], 'status': 'applied', 'resolution': 'appended', 'error_code': null},
+            ],
+            'summary': {'applied': actions.length, 'rejected': 0, 'duplicate': 0},
+          }),
+          200,
+        );
+      }
       final canned = demoApi[req.url.path];
       if (canned != null) return http.Response(jsonEncode(canned), 200);
       return http.Response(jsonEncode({'error': {'code': 'NOT_FOUND', 'message': 'x', 'details': {}}}), 404);
@@ -140,7 +155,9 @@ final Map<String, Object> demoApi = {
   '/api/v1/matches/demo-live': {
     ..._fixture('demo-live', 'in_progress', 2, 1, const Duration(minutes: -67), minute: 67),
     'sport_name': 'Football',
-    'can_score': false,
+    'can_score': true,
+    'version': 7,
+    'scoring_events': ['goal'],
     'timeline': [
       {'event_id': 'e1', 'type': 'match_start', 'label': 'Kick-off', 'compensated': false},
       {'event_id': 'e2', 'type': 'score', 'label': 'Goal', 'minute': 9, 'team_name': 'Alpha Falcons FC', 'compensated': false},
@@ -418,5 +435,28 @@ void main() {
       await tester.tap(find.text('Sign out').last);
       await tester.pumpAndSettle();
     }
+  });
+
+  testWidgets('organizer adds a goal from match detail and it syncs at once', (tester) async {
+    await pumpApp(tester);
+    await signIn(tester, 'organizer@nascon.test', 'Nascon@26');
+    await tester.ensureVisible(find.text("67'"));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text("67'"));
+    await tester.pumpAndSettle();
+    expect(find.text('Score entry'), findsOneWidget);
+    expect(find.text('Correct'), findsOneWidget); // only the goal that still counts
+    await tester.tap(find.text('+ Goal'));
+    await tester.pumpAndSettle();
+    expect(find.text('Add goal?'), findsOneWidget);
+    await tester.tap(find.text('Add'));
+    // The queue writes to Hive (real disk IO), so let real time pass between frames.
+    for (var i = 0; i < 10 && find.text('Applied: Goal for Alpha Falcons FC').evaluate().isEmpty; i++) {
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 100)));
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(find.text('Applied: Goal for Alpha Falcons FC'), findsOneWidget);
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 1700)));
+    await tester.pump(const Duration(seconds: 5));
   });
 }

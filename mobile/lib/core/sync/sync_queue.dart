@@ -4,9 +4,11 @@ import 'dart:math';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive/hive.dart';
 
+import '../../data/providers.dart';
 import '../api/api_client.dart';
 import '../api/api_exception.dart';
 import '../copy/error_messages.dart';
+import '../connectivity/connectivity.dart';
 import '../settings/settings.dart';
 
 /// Overridden in `main()` with the box opened before `runApp`.
@@ -14,7 +16,7 @@ final syncBoxProvider = Provider<Box<String>>((ref) => throw UnimplementedError(
 
 const syncBoxName = 'sync_queue';
 
-enum QueuedStatus { pending, rejected }
+enum QueuedStatus { pending, applied, rejected }
 
 /// One offline action, shaped like an item of `POST /audit/v1/offline-sync` plus display fields.
 /// Survives force-close because it is stored in Hive.
@@ -45,14 +47,14 @@ class QueuedAction {
 
   String? get errorMessage => errorCode == null ? null : messageFor(errorCode, status: 409);
 
-  QueuedAction rejected(String? code) => QueuedAction(
+  QueuedAction withStatus(QueuedStatus s, [String? code]) => QueuedAction(
         actionId: actionId,
         type: type,
         queuedAt: queuedAt,
         baseVersion: baseVersion,
         payload: payload,
         label: label,
-        status: QueuedStatus.rejected,
+        status: s,
         errorCode: code,
       );
 
@@ -137,6 +139,19 @@ class SyncQueue extends Notifier<SyncQueueState> {
     return a;
   }
 
+  /// Queues an action and, when online, sends it straight away. Returns true if it was sent now.
+  Future<bool> submit({
+    required String type,
+    required int baseVersion,
+    required Map<String, dynamic> payload,
+    required String label,
+  }) async {
+    await enqueue(type: type, baseVersion: baseVersion, payload: payload, label: label);
+    if (!ref.read(isOnlineProvider)) return false;
+    await flush();
+    return true;
+  }
+
   Future<void> remove(String actionId) async {
     await _box.delete(actionId);
     state = state.copyWith(items: state.items.where((a) => a.actionId != actionId).toList());
@@ -167,21 +182,50 @@ class SyncQueue extends Notifier<SyncQueueState> {
         for (final r in (res['results'] as List).cast<Map<String, dynamic>>()) r['action_id'] as String: r,
       };
       final next = <QueuedAction>[];
+      final applied = <String>[];
       for (final a in state.items) {
         final r = results[a.actionId];
         if (r == null) {
           next.add(a);
         } else if (r['status'] == 'rejected') {
-          final updated = a.rejected(r['error_code'] as String?);
+          final updated = a.withStatus(QueuedStatus.rejected, r['error_code'] as String?);
           await _box.put(a.actionId, jsonEncode(updated.toJson()));
           next.add(updated);
         } else {
+          // Applied (or an already-applied duplicate): gone from disk now, shown as "Applied"
+          // for a moment, then cleared.
           await _box.delete(a.actionId);
+          next.add(a.withStatus(QueuedStatus.applied));
+          applied.add(a.actionId);
         }
+      }
+      _refreshAffected(pending);
+      if (applied.isNotEmpty) {
+        Future<void>.delayed(const Duration(milliseconds: 1500), () {
+          if (!ref.mounted) return;
+          state = state.copyWith(items: state.items.where((a) => !applied.contains(a.actionId)).toList());
+        });
       }
       state = state.copyWith(items: next, syncing: false);
     } on ApiException catch (e) {
       state = state.copyWith(syncing: false, lastError: e.message);
+    }
+  }
+
+  /// Refetches the screens whose data the synced actions touched.
+  void _refreshAffected(List<QueuedAction> sent) {
+    for (final a in sent) {
+      if (a.type == 'score_event') {
+        final matchId = a.payload['match_id'];
+        if (matchId is String) ref.invalidate(matchProvider(matchId));
+        ref.invalidate(fixturesProvider);
+        ref.invalidate(standingsProvider);
+      } else {
+        for (final k in ['from_squad_id', 'to_squad_id']) {
+          final club = a.payload[k];
+          if (club is String) ref.invalidate(clubProvider(club));
+        }
+      }
     }
   }
 }
