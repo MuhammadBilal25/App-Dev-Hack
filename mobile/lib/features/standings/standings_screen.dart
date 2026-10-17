@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/brand/club_crest.dart';
 import '../../core/theme/status_colors.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/theme/typography.dart';
@@ -135,7 +134,7 @@ class _Table extends ConsumerWidget {
                     child: Row(
                       children: [
                         SizedBox(width: 28, child: Text('#', style: header)),
-                        Expanded(child: Text('TEAM', style: header)),
+                        Expanded(child: Text('Team', style: header)),
                         _Num('P', style: header),
                         _Num('GD', style: header),
                         _Num('PTS', style: header),
@@ -148,6 +147,11 @@ class _Table extends ConsumerWidget {
                   ],
                 ],
               ),
+            ),
+            const SizedBox(height: AppSpace.md),
+            Text(
+              'Dashed line = qualification cut-off. Ties use head-to-head first.',
+              style: text.bodyMedium!.copyWith(color: scheme.onSurfaceVariant),
             ),
           ],
         );
@@ -201,12 +205,11 @@ class _Row extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      ClubCrest(name: row.teamName, size: 24),
-                      const SizedBox(width: AppSpace.sm),
-                      Expanded(child: Text(row.teamName, style: text.titleMedium, maxLines: 1, overflow: TextOverflow.ellipsis)),
-                    ],
+                  Text(
+                    row.teamName,
+                    style: qualifies ? text.titleMedium : text.bodyLarge,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: AppSpace.xs),
                   StatusChip(kind: kind, label: label, icon: icon),
