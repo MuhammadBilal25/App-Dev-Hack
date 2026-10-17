@@ -17,6 +17,7 @@ const offlineSync = require('./services/offlineSync');
 const auth = require('./services/auth');
 const { guard, authorized } = require('./services/rbac');
 const { rateLimit } = require('./middleware/rateLimit');
+const { mobileRouter } = require('./routes/mobile');
 
 // Services return { status, body }; this sends it.
 const send = (res, r) => res.status(r.status).json(r.body);
@@ -71,6 +72,7 @@ function createApp() {
 
   // Realtime stream for the mobile app (SSE): /api/v1/stream?channels=match:m1,league:lg-1
   app.get('/api/v1/stream', (req, res) => realtime.subscribe(req, res));
+  app.use('/api/v1', mobileRouter());
 
   app.use((req, res) => {
     res.status(404).json(errorBody(new ApiError(404, 'NOT_FOUND', `No route for ${req.method} ${req.path}.`)));

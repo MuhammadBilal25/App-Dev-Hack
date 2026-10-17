@@ -5,6 +5,7 @@ const { state, resetMemory } = require('../state');
 const seed = require('../seed');
 const { validation } = require('../lib/errors');
 const { isInt } = require('../lib/validate');
+const { applyDemo } = require('../demo');
 
 function parseResetBody(body) {
   const b = body && typeof body === 'object' && !Array.isArray(body) ? body : {};
@@ -54,6 +55,7 @@ async function doReset(seedValue, stock) {
     c.release();
   }
   resetMemory(seedValue);
+  applyDemo();
   state.ready = true;
   return {
     status: 'reset_complete',

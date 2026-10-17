@@ -69,6 +69,11 @@ function aggregate(team, matches, pts, model, among) {
 function standings(leagueId) {
   const league = state.standingsLeagues.get(leagueId);
   if (!league) throw err(404, 'LEAGUE_NOT_FOUND', `League ${leagueId} does not exist.`, { league_id: leagueId });
+  return standingsFor(league);
+}
+
+// Computes the table for a league object of the shape registered by POST /audit/v1/leagues.
+function standingsFor(league) {
   const sport = state.sports.get(league.sport_id);
   const model = sport.scoring_model;
   const pts = league.points;
@@ -189,4 +194,4 @@ function standings(leagueId) {
   return { league_id: league.league_id, sport_id: league.sport_id, qualification_spots: k, table, h2h };
 }
 
-module.exports = { standings };
+module.exports = { standings, standingsFor };

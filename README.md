@@ -58,6 +58,7 @@ All passwords: `Nascon@26`
 | `POST /audit/v1/rbac-matrix` · `/audit/v1/rbac/*` | RBAC tokens and probes |
 | `POST /audit/v1/offline-sync` | Replay offline mobile actions |
 | `POST /api/v1/auth/login` · `GET /api/v1/me` · `GET /api/v1/ping` · `GET /api/v1/stream` | Mobile API (rate limited) |
+| `GET /api/v1/tenants/me` · `/leagues` · `/fixtures?league_id=` · `/matches/{id}` · `/standings/{league_id}` · `/clubs` · `/clubs/{id}` · `/catalogue` | Mobile read API: JWT required, tenant-isolated (403 cross-tenant). Demo data for `league-alpha-1` is re-seeded by every reset (`src/demo.js`) |
 
 A ready-made Postman collection is in `postman/NaSCon.postman_collection.json`.
 
