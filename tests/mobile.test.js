@@ -105,3 +105,35 @@ test('club profile, catalogue and cross-tenant isolation', async () => {
   const beta = (await call('GET', '/api/v1/clubs', undefined, await token('admin@nascon.test'))).body.clubs;
   assert.ok(beta.some((x) => x.club_id === 'club-beta-1'));
 });
+
+test('demo roster league accepts offline-sync transfers and score events', async () => {
+  const manager = await token('manager@nascon.test');
+  const before = (await call('GET', '/api/v1/clubs/club-alpha-1', undefined, manager)).body;
+  const mover = before.roster.find((p) => p.position === 'mf');
+  assert.equal(mover.version, 0);
+  const today = new Date().toISOString().slice(0, 10);
+  const r = await call('POST', '/audit/v1/offline-sync', {
+    device_id: 'dev-1',
+    actions: [
+      {
+        action_id: 'a1', type: 'roster_transfer', queued_at: '2026-10-17T10:00:00Z', base_version: 0,
+        payload: { request_id: 'rq-1', league_id: 'league-alpha-1', player_id: mover.player_id, type: 'transfer', from_squad_id: 'club-alpha-1', to_squad_id: 'club-alpha-2', effective_date: today, reason: 'Demo' },
+      },
+      {
+        action_id: 'a2', type: 'score_event', queued_at: '2026-10-17T10:00:01Z', base_version: 0,
+        payload: { event_id: 'sync-goal', match_id: 'demo-a1-r2-m1', type: 'score', payload: { team_id: 'club-alpha-3', event_type: 'goal', minute: 70 } },
+      },
+      {
+        action_id: 'a3', type: 'score_event', queued_at: '2026-10-17T10:00:02Z', base_version: 0,
+        payload: { event_id: 'sync-late', match_id: 'demo-a1-r1-m1', type: 'score', payload: { team_id: 'club-alpha-1', event_type: 'goal' } },
+      },
+    ],
+  });
+  assert.deepEqual(r.body.results.map((x) => x.status), ['applied', 'applied', 'rejected']);
+  assert.equal(r.body.results[2].error_code, 'MATCH_NOT_IN_PROGRESS');
+  const after = (await call('GET', '/api/v1/clubs/club-alpha-2', undefined, manager)).body;
+  assert.equal(after.roster.find((p) => p.player_id === mover.player_id).version, 1);
+  assert.ok(!(await call('GET', '/api/v1/clubs/club-alpha-1', undefined, manager)).body.roster.some((p) => p.player_id === mover.player_id));
+  const m = (await call('GET', '/api/v1/matches/demo-a1-r2-m1', undefined, manager)).body;
+  assert.equal(`${m.home.score}:${m.away.score}`, '2:2');
+});

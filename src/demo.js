@@ -7,6 +7,8 @@
 // scoring events come from the sport config.
 const { state } = require('./state');
 const scoring = require('./services/scoring');
+const roster = require('./services/roster');
+const { addDays, today } = require('./lib/validate');
 
 const DEMO_LEAGUE = 'league-alpha-1';
 
@@ -72,7 +74,23 @@ function applyDemo() {
   evSeq = 0;
   for (const c of EXTRA_CLUBS) state.clubs.set(c.club_id, JSON.parse(JSON.stringify(c)));
   for (const [id, staff] of Object.entries(STAFF)) if (staff) state.clubs.get(id).staff = staff.map((s) => ({ ...s }));
-  [...state.clubs.values()].filter((c) => c.league_id === DEMO_LEAGUE).forEach(addPlayers);
+  const demoClubs = [...state.clubs.values()].filter((c) => c.league_id === DEMO_LEAGUE);
+  demoClubs.forEach(addPlayers);
+
+  // Squads = the demo clubs, so transfers, loans and releases (and offline-sync roster actions)
+  // work on the demo players. Squad size and required positions come from the sport config.
+  roster.setup({
+    league: {
+      league_id: DEMO_LEAGUE,
+      tenant_id: 'tenant-alpha',
+      sport_id: state.leagues.get(DEMO_LEAGUE).sport_id,
+      transfer_window: { open: addDays(today(), -30), close: addDays(today(), 60) },
+    },
+    squads: demoClubs.map((c) => ({ squad_id: c.club_id, club_id: c.club_id, tenant_id: c.tenant_id })),
+    players: [...state.players.values()]
+      .filter((p) => demoClubs.some((c) => c.club_id === p.club_id))
+      .map((p) => ({ player_id: p.player_id, name: p.name, position: p.position, role: p.role, squad_id: p.club_id })),
+  });
 
   const now = Date.now();
   const H = 3600 * 1000;

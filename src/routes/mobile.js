@@ -8,6 +8,7 @@ const { can, forbid } = require('../services/rbac');
 const scoring = require('../services/scoring');
 const { standingsFor } = require('../services/standings');
 const store = require('../services/store');
+const roster = require('../services/roster');
 
 // Read API for the mobile app. Every route authenticates the JWT, then enforces tenant isolation
 // through the RBAC policy layer: another tenant's league or club answers 403 FORBIDDEN.
@@ -96,6 +97,29 @@ function eventLabel(e, sport) {
   if (e.type === 'tiebreak_winner') return 'Tie-break winner';
   if (e.type === 'compensation') return 'Correction';
   return sport.name;
+}
+
+// Current squad from the roster engine when the club's league is set up there (so transfers show
+// up at once), otherwise the static club players. `version` is the base_version for offline sync.
+function clubRoster(club) {
+  const league = state.rosterLeagues.get(club.league_id);
+  if (league && league.squad_ids.includes(club.club_id)) {
+    return roster.squadMembers(club.club_id).map((p) => {
+      const base = state.players.get(p.player_id) || {};
+      return {
+        player_id: p.player_id,
+        name: p.name,
+        position: p.position,
+        role: p.role,
+        shirt: base.shirt || null,
+        on_loan: !!(p.loan && !p.loan.returned),
+        version: roster.playerVersion(p.player_id),
+      };
+    });
+  }
+  return [...state.players.values()]
+    .filter((p) => p.club_id === club.club_id)
+    .map((p) => ({ player_id: p.player_id, name: p.name, position: p.position, role: p.role, shirt: p.shirt || null, on_loan: false, version: 0 }));
 }
 
 function mobileRouter() {
@@ -213,9 +237,7 @@ function mobileRouter() {
       venue: clone(club.home_venue),
       social: clone(club.social || {}),
       staff: clone(club.staff || []),
-      roster: [...state.players.values()]
-        .filter((p) => p.club_id === club.club_id)
-        .map((p) => ({ player_id: p.player_id, name: p.name, position: p.position, role: p.role, shirt: p.shirt || null })),
+      roster: clubRoster(club),
       stats: row
         ? { rank: row.rank, played: row.played, won: row.won, drawn: row.drawn, lost: row.lost, points: row.points, diff: row.diff }
         : null,
