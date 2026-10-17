@@ -2,7 +2,8 @@
 
 const express = require('express');
 const { state, clone } = require('../state');
-const { err } = require('../lib/errors');
+const { err, validation } = require('../lib/errors');
+const { isObj, isStr } = require('../lib/validate');
 const { authenticate } = require('../services/auth');
 const { can, forbid } = require('../services/rbac');
 const scoring = require('../services/scoring');
@@ -238,11 +239,33 @@ function mobileRouter() {
       social: clone(club.social || {}),
       staff: clone(club.staff || []),
       roster: clubRoster(club),
+      positions: league ? Object.keys((state.rosterLeagues.get(league.league_id) || state.sports.get(league.sport_id).roster).required_positions || {}) : [],
       stats: row
         ? { rank: row.rank, played: row.played, won: row.won, drawn: row.drawn, lost: row.lost, points: row.points, diff: row.diff }
         : null,
       can_manage: can(req.user, 'club.roster.write', club),
     });
+  });
+
+  // Club Manager of this club only. `request_id` makes offline retries idempotent.
+  const added = new Map();
+  r.post('/clubs/:clubId/players', auth, (req, res) => {
+    const club = lookup(state.clubs, 'club', req.params.clubId);
+    if (!can(req.user, 'club.roster.write', club)) throw forbid('club.roster.write');
+    const b = req.body;
+    const bad = [];
+    if (!isObj(b)) throw validation(['body']);
+    if (!isStr(b.name) || !b.name.trim() || b.name.length > 80) bad.push('name');
+    if (!isStr(b.position) || !/^[A-Za-z0-9_ -]{1,20}$/.test(b.position.trim())) bad.push('position');
+    if (!roster.ROLES.includes(b.role)) bad.push('role');
+    if (b.request_id !== undefined && !isStr(b.request_id)) bad.push('request_id');
+    if (bad.length) throw validation(bad);
+    const key = b.request_id ? `${club.club_id}|${b.request_id}` : null;
+    if (key && added.has(key)) return res.status(200).json(added.get(key));
+    const out = roster.addPlayer(club.league_id, club.club_id, { name: b.name.trim(), position: b.position.trim().toLowerCase(), role: b.role }, req.user.email);
+    state.players.set(out.player.player_id, { ...out.player, club_id: club.club_id, tenant_id: club.tenant_id });
+    if (key) added.set(key, out);
+    res.status(201).json(out);
   });
 
   r.get('/catalogue', auth, async (req, res) => {

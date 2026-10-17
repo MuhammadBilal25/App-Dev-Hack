@@ -137,3 +137,26 @@ test('demo roster league accepts offline-sync transfers and score events', async
   const m = (await call('GET', '/api/v1/matches/demo-a1-r2-m1', undefined, manager)).body;
   assert.equal(`${m.home.score}:${m.away.score}`, '2:2');
 });
+
+test('club manager adds a player to their own squad only; squad size enforced', async () => {
+  const manager = await token('manager@nascon.test');
+  const body = { name: 'New Signing', position: 'gk', role: 'substitute', request_id: 'r-1' };
+  const r = await call('POST', '/api/v1/clubs/club-alpha-1/players', body, manager);
+  assert.equal(r.status, 201);
+  assert.equal(r.body.audit_entry.action, 'add');
+  assert.equal((await call('POST', '/api/v1/clubs/club-alpha-1/players', body, manager)).status, 200);
+  const club = (await call('GET', '/api/v1/clubs/club-alpha-1', undefined, manager)).body;
+  assert.equal(club.roster.filter((p) => p.name === 'New Signing').length, 1);
+  assert.deepEqual(club.positions, ['gk']);
+  const hist = (await call('GET', `/audit/v1/roster/history/${r.body.player.player_id}`)).body;
+  assert.equal(hist.current_squad_id, 'club-alpha-1');
+
+  assert.equal((await call('POST', '/api/v1/clubs/club-alpha-2/players', body, manager)).status, 403);
+  assert.equal((await call('POST', '/api/v1/clubs/club-alpha-1/players', body, await token('viewer@nascon.test'))).status, 403);
+  assert.equal((await call('POST', '/api/v1/clubs/club-alpha-1/players', { name: '', position: 'gk', role: 'x' }, manager)).body.error.code, 'VALIDATION_ERROR');
+
+  let last;
+  for (let i = 0; i < 20; i++) last = await call('POST', '/api/v1/clubs/club-alpha-1/players', { name: `P ${i}`, position: 'mf', role: 'substitute' }, manager);
+  assert.equal(last.status, 409);
+  assert.equal(last.body.error.code, 'SQUAD_FULL');
+});

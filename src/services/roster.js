@@ -295,4 +295,43 @@ function history(playerId, asOf) {
   };
 }
 
-module.exports = { setup, transfer, history, validateTransfer, checkTransfer, applyTransfer, checkTransferReplay, playerVersion, squadMembers };
+// Registers a new player straight into a squad (production route, Club Manager). Audited as "add".
+function addPlayer(leagueId, squadId, { name, position, role }, who) {
+  const league = state.rosterLeagues.get(leagueId);
+  if (!league || !league.squad_ids.includes(squadId)) {
+    throw err(404, 'SQUAD_NOT_FOUND', `Squad ${squadId} is not registered in ${leagueId}.`, { squad_id: squadId });
+  }
+  if (squadMembers(squadId).length + 1 > league.max_squad_size) {
+    throw err(409, 'SQUAD_FULL', `Squad ${squadId} is full.`, { squad_id: squadId, max_squad_size: league.max_squad_size });
+  }
+  let n = state.rosterPlayers.size + 1;
+  while (state.rosterPlayers.has(`${squadId}-p${n}`)) n += 1;
+  const p = {
+    player_id: `${squadId}-p${n}`,
+    name,
+    position,
+    league_id: leagueId,
+    role,
+    segments: [{ from: today(), squad_id: squadId, parent_squad_id: null }],
+    loan: null,
+    audit: [],
+  };
+  state.rosterPlayers.set(p.player_id, p);
+  const entry = {
+    audit_id: nextAuditId(),
+    action: 'add',
+    player_id: p.player_id,
+    league_id: leagueId,
+    from_squad_id: null,
+    to_squad_id: squadId,
+    effective_date: today(),
+    state: 'active',
+    who: who || 'unknown',
+    when: nowIso(),
+    why: 'Player registered',
+  };
+  appendAudit(p, entry);
+  return { player: { player_id: p.player_id, name, position, role, on_loan: false, version: p.audit.length }, audit_entry: clone(entry) };
+}
+
+module.exports = { ROLES, setup, addPlayer, transfer, history, validateTransfer, checkTransfer, applyTransfer, checkTransferReplay, playerVersion, squadMembers };
