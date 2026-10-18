@@ -185,6 +185,20 @@ function memberAdd(req) {
   return { status: 200, body: guestCart.cartView(user.user_id) };
 }
 
+// POST /api/v1/member-cart/set { variant_id, quantity }: the cart screen's - / + / delete (0 removes).
+function memberSet(req) {
+  const user = auth.authenticate(req);
+  const b = req.body;
+  if (!isObj(b) || !isStr(b.variant_id) || !isInt(b.quantity) || b.quantity < 0 || b.quantity > 10) throw validation(['variant_id', 'quantity']);
+  const cart = memberCarts().get(user.user_id) || { user_id: user.user_id, items: [] };
+  const line = cart.items.find((it) => it.variant_id === b.variant_id);
+  if (!line) throw err(404, 'VARIANT_NOT_FOUND', `${b.variant_id} is not in your cart.`, { variant_id: b.variant_id });
+  if (b.quantity === 0) cart.items = cart.items.filter((it) => it !== line);
+  else line.quantity = b.quantity;
+  memberCarts().set(user.user_id, cart);
+  return { status: 200, body: guestCart.cartView(user.user_id) };
+}
+
 // POST /api/v1/member-cart/clear (after a paid checkout)
 function memberClear(req) {
   const user = auth.authenticate(req);
@@ -192,4 +206,4 @@ function memberClear(req) {
   return { status: 200, body: guestCart.cartView(user.user_id) };
 }
 
-module.exports = { issueToken, matchView, costreamView, playerView, clubView, stageItem, getCart, mergeAfterLogin, memberCart, memberAdd, memberClear };
+module.exports = { issueToken, matchView, costreamView, playerView, clubView, stageItem, getCart, mergeAfterLogin, memberCart, memberAdd, memberSet, memberClear };

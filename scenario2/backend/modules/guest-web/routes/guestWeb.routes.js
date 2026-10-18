@@ -23,6 +23,7 @@ function guestWebRouter() {
   // Signed-in member cart used by the web player (checkout goes through POST /api/v1/checkout).
   r.get('/api/v1/member-cart', controller.memberCart);
   r.post('/api/v1/member-cart', controller.memberAdd);
+  r.post('/api/v1/member-cart/set', controller.memberSet);
   r.post('/api/v1/member-cart/clear', controller.memberClear);
   return r;
 }

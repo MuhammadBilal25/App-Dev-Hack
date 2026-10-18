@@ -93,6 +93,32 @@
     </form>
   </div>
 
+  <div id="cart-sheet" class="sheet" role="dialog" aria-modal="true" aria-labelledby="cart-title" hidden>
+    <div class="sheet-bar">
+      <button id="cart-back" class="icon-btn" type="button" aria-label="Back">&#8592;</button>
+      <h2 id="cart-title">Your cart</h2>
+      <span id="cart-role" class="role-chip"></span>
+    </div>
+    <p class="synced">&#10003; Online &middot; all changes synced</p>
+    <div id="cart-lines"></div>
+    <p id="cart-empty" class="price" hidden>Your cart is empty. Add the pinned jersey from the match page.</p>
+    <form id="discount-form" class="discount">
+      <label for="discount-code">Discount code (optional)</label>
+      <div class="discount-row">
+        <input id="discount-code" type="text" placeholder="e.g. WELCOME10" autocomplete="off">
+        <button class="btn" type="submit">Apply</button>
+      </div>
+      <p id="discount-msg" class="price" role="status" aria-live="polite"></p>
+    </form>
+    <div class="totals">
+      <div><span>Subtotal</span><span id="cart-subtotal">PKR 0.00</span></div>
+      <div id="discount-line" hidden><span>Discount</span><span id="cart-discount">- PKR 0.00</span></div>
+      <div class="grand"><span>Total</span><span id="cart-total">PKR 0.00</span></div>
+    </div>
+    <button id="cart-pay" class="btn pay" type="button">&#128274; Checkout &middot; <span id="cart-pay-amount">PKR 0.00</span></button>
+    <p class="price center">Prices and stock are checked again when you pay.</p>
+  </div>
+
   <div id="qr-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="qr-title" hidden>
     <h2 id="qr-title">Scan to open</h2>
     <p>Scan with a phone camera or the NaSCon app (Scan a QR code).</p>

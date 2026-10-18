@@ -209,25 +209,127 @@
     }
   }
 
-  // Pays with the demo card through the same checkout API the mobile app uses, so the order
-  // shows up in the app under Profile > My orders.
+  // ---------------- cart screen (same layout as the app) ----------------
+  const pkr = (minor) => 'PKR ' + (minor / 100).toFixed(2);
+  let discountCode = null;
+  let lastQuote = null;
+
   async function checkout() {
     if (!memberToken) return openModal('checkout');
     await mergeCart();
+    lastFocus = document.activeElement;
+    const u = currentUser();
+    $('cart-role').textContent = u ? ({ viewer: 'Viewer', player: 'Player', club_manager: 'Club manager', league_organizer: 'Organizer', super_admin: 'Admin' }[u.role] || u.role) : '';
+    $('cart-sheet').hidden = false;
+    document.body.style.overflow = 'hidden';
+    $('cart-back').focus();
+    await renderCart();
+  }
+
+  function closeCart() {
+    $('cart-sheet').hidden = true;
+    document.body.style.overflow = '';
+    if (lastFocus && lastFocus.focus) lastFocus.focus();
+  }
+
+  // The server prices the cart (stock, discount) with the same quote API the app uses.
+  async function renderCart() {
     const cart = await refreshMemberCart();
-    if (!cart || cart.items.length === 0) return toast('Your cart is empty. Add the pinned jersey first.');
-    const total = (cart.subtotal_minor / 100).toFixed(2);
-    const n = cart.total_items;
-    if (!window.confirm('Pay PKR ' + total + ' for ' + n + (n === 1 ? ' item' : ' items') + ' with the demo card?')) return;
+    const items = cart ? cart.items : [];
+    $('cart-empty').hidden = items.length > 0;
+    $('cart-lines').textContent = '';
+    if (items.length === 0) {
+      lastQuote = null;
+      $('cart-subtotal').textContent = pkr(0);
+      $('cart-total').textContent = pkr(0);
+      $('cart-pay-amount').textContent = pkr(0);
+      $('discount-line').hidden = true;
+      $('cart-pay').disabled = true;
+      return;
+    }
+    const q = await api('POST', '/api/v1/cart/quote', { items: items.map((it) => ({ variant_id: it.variant_id, quantity: it.quantity })), discount_code: discountCode }, memberToken);
+    lastQuote = q.status === 200 ? q.data : null;
+    const lines = lastQuote ? lastQuote.lines : items.map((it) => ({ ...it, product_name: it.variant_id, line_total_minor: it.quantity * it.unit_price_minor, status: 'ok' }));
+    for (const l of lines) $('cart-lines').append(lineView(l));
+    const sub = lastQuote ? lastQuote.subtotal_minor : cart.subtotal_minor;
+    const disc = lastQuote ? lastQuote.discount_minor : 0;
+    const total = lastQuote ? lastQuote.total_minor : sub;
+    $('cart-subtotal').textContent = pkr(sub);
+    $('discount-line').hidden = !(disc > 0);
+    $('cart-discount').textContent = '- ' + pkr(disc);
+    $('cart-total').textContent = pkr(total);
+    $('cart-pay-amount').textContent = pkr(total);
+    $('cart-pay').disabled = lines.some((l) => l.status === 'out_of_stock' || l.status === 'insufficient_stock' || l.status === 'unavailable');
+    if (lastQuote && discountCode) {
+      $('discount-msg').textContent = lastQuote.discount_valid ? discountCode + ' applied: ' + lastQuote.discount_percent + '% off.' : discountCode + ' is not a valid code.';
+    }
+  }
+
+  function el(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined) e.textContent = text;
+    return e;
+  }
+
+  function lineView(l) {
+    const row = el('div', 'cart-line');
+    row.append(el('div', 'cart-thumb', '\u{1F455}'));
+    const mid = el('div');
+    mid.append(el('h3', '', l.product_name));
+    const meta = [l.club_name, l.size, l.color].filter(Boolean).join(' \u00b7 ');
+    if (meta) mid.append(el('p', 'meta', meta));
+    mid.append(el('p', 'meta', pkr(l.unit_price_minor) + ' each'));
+    if (l.message) mid.append(el('p', 'warn', l.message));
+    const step = el('div', 'stepper');
+    const minus = el('button', '', '\u2212');
+    minus.type = 'button';
+    minus.setAttribute('aria-label', 'One fewer ' + (l.size || ''));
+    minus.disabled = l.quantity <= 1;
+    minus.onclick = () => setQty(l.variant_id, l.quantity - 1);
+    const plus = el('button', '', '+');
+    plus.type = 'button';
+    plus.setAttribute('aria-label', 'One more ' + (l.size || ''));
+    plus.disabled = l.available_stock !== undefined && l.quantity >= Math.min(10, l.available_stock);
+    plus.onclick = () => setQty(l.variant_id, l.quantity + 1);
+    step.append(minus, el('span', '', String(l.quantity)), plus);
+    mid.append(step);
+    const right = el('div', 'line-right');
+    const del = el('button', 'icon-btn', '\u{1F5D1}');
+    del.type = 'button';
+    del.setAttribute('aria-label', 'Remove ' + l.product_name);
+    del.onclick = () => setQty(l.variant_id, 0);
+    right.append(del, el('span', 'line-total', pkr(l.line_total_minor)));
+    row.append(mid, right);
+    return row;
+  }
+
+  async function setQty(variantId, quantity) {
+    await api('POST', '/api/v1/member-cart/set', { variant_id: variantId, quantity }, memberToken);
+    await renderCart();
+  }
+
+  // Pays with the demo card through the same checkout API the mobile app uses, so the order
+  // shows up in the app under Profile > My orders.
+  async function payCart() {
+    const cart = await refreshMemberCart();
+    if (!cart || cart.items.length === 0) return;
+    $('cart-pay').disabled = true;
     const orderId = 'web-' + Date.now().toString(36);
     const r = await api('POST', '/api/v1/checkout', {
       order_id: orderId,
       items: cart.items.map((it) => ({ variant_id: it.variant_id, quantity: it.quantity })),
+      discount_code: lastQuote && lastQuote.discount_valid ? discountCode : undefined,
       payment: { token: 'tok_success' },
     }, memberToken);
+    $('cart-pay').disabled = false;
     if (r.status === 201 || r.status === 200) {
       await api('POST', '/api/v1/member-cart/clear', {}, memberToken);
       $('cart-count').textContent = '0';
+      discountCode = null;
+      $('discount-code').value = '';
+      $('discount-msg').textContent = '';
+      closeCart();
       toast('Paid. Order ' + r.data.order_id + ' for PKR ' + (r.data.total_minor / 100).toFixed(2) + '. It is also in the app under My orders.');
     } else {
       const e = r.data && r.data.error;
@@ -479,6 +581,14 @@
   $('auth-form').addEventListener('submit', signIn);
   $('auth-cancel').addEventListener('click', closeModal);
   $('qr-btn').addEventListener('click', openQr);
+  $('cart-back').addEventListener('click', closeCart);
+  $('cart-pay').addEventListener('click', payCart);
+  $('discount-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    discountCode = $('discount-code').value.trim().toUpperCase() || null;
+    if (!discountCode) $('discount-msg').textContent = '';
+    renderCart();
+  });
   $('qr-close').addEventListener('click', closeModal);
   $('signin-btn').addEventListener('click', () => openModal('account'));
   $('signout-btn').addEventListener('click', () => signOut(false));
@@ -490,7 +600,8 @@
   $('golive-stop').addEventListener('click', () => stopBroadcast(true));
   $('auth-backdrop').addEventListener('click', closeModal);
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && (!$('auth-modal').hidden || !$('qr-modal').hidden)) closeModal();
+    if (e.key === 'Escape' && !$('cart-sheet').hidden) closeCart();
+    else if (e.key === 'Escape' && (!$('auth-modal').hidden || !$('qr-modal').hidden)) closeModal();
   });
 
   ensureGuest().then(refreshCart).catch(() => {});
