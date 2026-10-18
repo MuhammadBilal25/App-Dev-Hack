@@ -18,7 +18,7 @@ const syncBoxName = 'sync_queue';
 
 enum QueuedStatus { pending, applied, rejected }
 
-/// One offline action, shaped like an item of `POST /audit/v1/offline-sync` plus display fields.
+/// One offline action, shaped like an item of the offline-sync contract plus display fields.
 /// Survives force-close because it is stored in Hive.
 class QueuedAction {
   const QueuedAction({
@@ -34,7 +34,7 @@ class QueuedAction {
 
   final String actionId;
 
-  /// `score_event` or `roster_transfer` (sent through offline-sync), or `player_add` (sent to
+  /// `score_event` or `roster_transfer` (sent through `POST /api/v1/sync`), or `player_add` (sent to
   /// `POST /api/v1/clubs/{club_id}/players`, idempotent through its request_id).
   final String type;
   final String queuedAt;
@@ -101,7 +101,8 @@ class SyncQueueState {
 }
 
 /// Durable queue of writes made while offline. Writes are replayed in one batch through the
-/// backend's offline-sync contract; each action gets its own applied / rejected result.
+/// authenticated `POST /api/v1/sync` (offline-sync contract plus a per-action permission check);
+/// each action gets its own applied / rejected result.
 class SyncQueue extends Notifier<SyncQueueState> {
   Box<String> get _box => ref.read(syncBoxProvider);
 
@@ -196,7 +197,7 @@ class SyncQueue extends Notifier<SyncQueueState> {
         return;
       }
       final res = await ref.read(apiClientProvider).post(
-            '/audit/v1/offline-sync',
+            '/api/v1/sync',
             body: {
               'device_id': ref.read(settingsProvider.notifier).deviceId(),
               'actions': pending.map((a) => a.toWire()).toList(),
@@ -251,11 +252,16 @@ class SyncQueue extends Notifier<SyncQueueState> {
         if (matchId is String) ref.invalidate(matchProvider(matchId));
         ref.invalidate(fixturesProvider);
         ref.invalidate(standingsProvider);
+        ref.invalidate(homeProvider);
+        ref.invalidate(leagueProvider);
+        ref.invalidate(organizerDashboardProvider);
       } else {
         for (final k in ['from_squad_id', 'to_squad_id', 'club_id']) {
           final club = a.payload[k];
           if (club is String) ref.invalidate(clubProvider(club));
         }
+        ref.invalidate(managerDashboardProvider);
+        ref.invalidate(rosterHistoryProvider);
       }
     }
   }

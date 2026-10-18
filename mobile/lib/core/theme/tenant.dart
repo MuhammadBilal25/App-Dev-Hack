@@ -83,10 +83,10 @@ class TenantBrand {
   static TenantBrand fromTenant(Tenant? t) {
     if (t == null) return platform;
     final known = _known[t.id];
-    if (known != null) return known.withName(t.name, logoUrl: t.logoUrl);
+    if (known != null && !t.custom) return known.withName(t.name, logoUrl: t.logoUrl);
     final seed = parseHex(t.primaryColor) ?? platform.brandLight;
     final light = ColorScheme.fromSeed(seedColor: seed, brightness: Brightness.light);
-    final dark = ColorScheme.fromSeed(seedColor: seed, brightness: Brightness.dark);
+    final dark = ColorScheme.fromSeed(seedColor: parseHex(t.darkColor) ?? seed, brightness: Brightness.dark);
     return TenantBrand(
       id: t.id,
       name: t.name,
@@ -115,10 +115,11 @@ class TenantBrand {
       );
 
   @override
-  bool operator ==(Object other) => other is TenantBrand && other.id == id && other.name == name;
+  bool operator ==(Object other) =>
+      other is TenantBrand && other.id == id && other.name == name && other.brandLight == brandLight && other.logoUrl == logoUrl;
 
   @override
-  int get hashCode => Object.hash(id, name);
+  int get hashCode => Object.hash(id, name, brandLight, logoUrl);
 }
 
 /// First letters of up to [max] words: "Alpha FC" -> "AFC".

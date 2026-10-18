@@ -74,6 +74,6 @@ test('order lifecycle transitions and catalogue', async () => {
   assert.equal(store.transitionOrder('life', 'packed').status, 'packed');
   assert.throws(() => store.transitionOrder('life', 'paid'));
   assert.throws(() => store.transitionOrder('ghost', 'packed'));
-  assert.equal(store.catalogue('tenant-alpha').length, 1);
-  assert.equal(store.catalogue('tenant-beta').length, 0);
+  assert.ok(store.catalogue('tenant-alpha').some((p) => p.product_id === 'prod-jersey-001'));
+  assert.ok(store.catalogue('tenant-beta').every((p) => p.tenant_id === 'tenant-beta'));
 });

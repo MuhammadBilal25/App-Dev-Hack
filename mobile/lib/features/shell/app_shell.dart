@@ -14,14 +14,15 @@ class _Tab {
 }
 
 const _tabs = [
-  _Tab('tab_fixtures', 'Fixtures', Icons.calendar_today_outlined, Icons.calendar_today_outlined),
+  _Tab('tab_home', 'Home', Icons.home_outlined, Icons.home),
+  _Tab('tab_fixtures', 'Fixtures', Icons.calendar_today_outlined, Icons.calendar_today),
   _Tab('tab_standings', 'Standings', Icons.bar_chart_rounded, Icons.bar_chart_rounded),
-  _Tab('tab_store', 'Store', Icons.shopping_bag_outlined, Icons.shopping_bag_outlined),
-  _Tab('tab_club', 'Club', Icons.shield_outlined, Icons.shield_outlined),
-  _Tab('tab_profile', 'Profile', Icons.person_outline, Icons.person_outline),
+  _Tab('tab_store', 'Store', Icons.shopping_bag_outlined, Icons.shopping_bag),
+  _Tab('tab_profile', 'Profile', Icons.person_outline, Icons.person),
 ];
 
-/// Five labelled tabs, the same for every role (UI.md §6.6). Role-only tools live inside screens.
+/// Five labelled tabs, the same for every role (UI.md §6.6). Role tools (organizer, club
+/// manager, admin) open from the workspace card on Home and from Profile.
 class AppShell extends StatelessWidget {
   const AppShell({super.key, required this.shell});
 

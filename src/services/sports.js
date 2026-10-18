@@ -68,9 +68,18 @@ function validateSport(b) {
   if (bad.length) throw validation(bad);
 }
 
+// Demo-only sports (seeded for the app, not part of the Section 5.5 baseline) give way to a sport
+// created with the same id, so they can never block a mystery sport.
+let evictDemoSport = null;
+const onDemoSportReplaced = (fn) => { evictDemoSport = fn; };
+
 function createSport(b) {
   validateSport(b);
-  if (state.sports.has(b.sport_id)) throw err(409, 'SPORT_EXISTS', `Sport ${b.sport_id} already exists.`, { sport_id: b.sport_id });
+  if (state.sports.has(b.sport_id)) {
+    const meta = state.sportMeta && state.sportMeta.get(b.sport_id);
+    if (!(meta && meta.demo && evictDemoSport)) throw err(409, 'SPORT_EXISTS', `Sport ${b.sport_id} already exists.`, { sport_id: b.sport_id });
+    evictDemoSport(b.sport_id);
+  }
   const config = {
     sport_id: b.sport_id,
     name: b.name,
@@ -92,4 +101,4 @@ function getSport(sportId) {
   return s;
 }
 
-module.exports = { createSport, getSport, validTieBreakOrder };
+module.exports = { createSport, getSport, validTieBreakOrder, validateSport, onDemoSportReplaced };

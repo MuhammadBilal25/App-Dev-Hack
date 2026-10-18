@@ -129,5 +129,38 @@ salt is read only from the environment; `.env` is git-ignored and `.env.example`
 variable. `npm ci` uses a committed lockfile.
 
 **Consequences.** No manual steps or pre-created volumes, and the stack is healthy within
-seconds. Heavier optional images (MinIO, RabbitMQ) are left out, which keeps the build well inside
-the 10-minute and 8 GB limits.
+seconds. RabbitMQ is left out, which keeps the build well inside the 10-minute and 8 GB limits.
+MinIO was added later for image uploads (ADR-9); the API does not wait for it to be healthy.
+
+---
+
+## ADR-9: Object storage in MinIO, streamed through the API
+
+**Context.** Product photos and logos are uploaded from phones and must live in approved
+self-hosted object storage, without exposing storage credentials or local file paths.
+
+**Decision.** MinIO runs as its own container (`bitnamilegacy/minio`, a pinned MinIO build; the
+official `minio/minio` image is no longer on Docker Hub). The app uploads raw image bytes to the
+API, which checks the real type from the magic bytes (JPEG, PNG, WebP) and the 5 MB limit, stores
+the object under `products|clubs|tenants/<id>/<uuid>.<ext>` and keeps its metadata on the product.
+Clients read images from `GET /media/{key}`, streamed by the API from MinIO. Bucket creation
+retries in the background, so a slow MinIO never affects `/health`; uploads answer 503 until ready.
+
+**Consequences.** Phones only talk to port 8080, MinIO credentials stay on the server, and unit
+tests use the same code path with an in-memory store.
+
+---
+
+## ADR-10: A production API layer beside the autograder contract
+
+**Context.** `/audit/v1/*` is a frozen contract. The app needs authenticated, role-scoped versions
+of the same operations plus platform administration.
+
+**Decision.** `/api/v1` routes (`routes/mobile.js`, `ops.js`, `shop.js`, `admin.js`) authenticate,
+authorize through the same policy table (`rbac.js`), then call the same engines (scoring, fixtures,
+roster, store). New platform data (sport metadata, settings, categories, discount codes, enriched
+orders, activity log) lives next to the existing state and is re-created by `/reset`. Demo-only
+sports give way to a mystery sport with the same id, so demo content can never break a graded call.
+
+**Consequences.** One engine per rule, two entry points. The audit contract and its tests are
+unchanged; every production write is recorded in the activity log.

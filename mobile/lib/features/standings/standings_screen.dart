@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/theme/status_colors.dart';
 import '../../core/theme/tokens.dart';
@@ -10,6 +11,7 @@ import '../../core/widgets/status_chip.dart';
 import '../../data/models.dart';
 import '../../data/providers.dart';
 import '../shell/tab_page.dart';
+import '../sports/sports_screens.dart';
 
 class StandingsScreen extends ConsumerStatefulWidget {
   const StandingsScreen({super.key});
@@ -100,7 +102,22 @@ class _StandingsScreenState extends ConsumerState<StandingsScreen> {
                 message: 'No leagues yet. Standings appear here once your organisation runs a league.',
               );
             }
-            return _Table(leagueId: id);
+            final l = current!;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: () => context.push('/leagues/${Uri.encodeComponent(l.id)}'),
+                    icon: const Icon(Icons.info_outline),
+                    label: const Text('League page'),
+                  ),
+                ),
+                // Knockout tournaments have a bracket instead of a points table.
+                if (l.format == 'single_elim' || l.format == 'double_elim') BracketView(leagueId: l.id) else _Table(leagueId: id),
+              ],
+            );
           },
         ),
       ],

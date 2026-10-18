@@ -19,6 +19,18 @@ function passwordMatches(pw) {
   return crypto.timingSafeEqual(h, DEMO_HASH);
 }
 
+// Accounts created through the admin API get their own salt and scrypt hash.
+function hashPassword(pw) {
+  const salt = crypto.randomBytes(16);
+  return { salt: salt.toString('hex'), hash: crypto.scryptSync(String(pw), salt, 32).toString('hex') };
+}
+
+function userPasswordMatches(user, pw) {
+  if (!user.password) return passwordMatches(pw);
+  const h = crypto.scryptSync(String(pw), Buffer.from(user.password.salt, 'hex'), 32);
+  return crypto.timingSafeEqual(h, Buffer.from(user.password.hash, 'hex'));
+}
+
 function issueToken(user) {
   return jwt.sign({ sub: user.user_id, email: user.email, role: user.role, tenant_id: user.tenant_id }, SECRET, {
     algorithm: 'HS256',
@@ -41,6 +53,7 @@ function authenticate(req) {
   }
   const user = [...state.users.values()].find((u) => u.user_id === claims.sub);
   if (!user) throw unauth('Token subject no longer exists.');
+  if (user.active === false) throw unauth('This account has been disabled.');
   return user;
 }
 
@@ -49,7 +62,8 @@ function login(body) {
     throw err(400, 'VALIDATION_ERROR', 'Email and password are required.', { fields: ['email', 'password'] });
   }
   const user = state.users.get(body.email.trim().toLowerCase());
-  if (!user || !passwordMatches(body.password)) throw unauth('Email or password is incorrect.');
+  if (!user || !userPasswordMatches(user, body.password)) throw unauth('Email or password is incorrect.');
+  if (user.active === false) throw unauth('This account has been disabled.');
   return { token: issueToken(user), expires_in: TTL_SECONDS, user: publicUser(user) };
 }
 
@@ -65,6 +79,8 @@ function publicUser(u) {
     league_ids: u.league_ids || [],
     club_id: u.club_id || null,
     player_id: u.player_id || null,
+    store_access: u.role === 'super_admin' || (u.role === 'club_manager' && u.store_access !== false),
+    active: u.active !== false,
   };
 }
 
@@ -90,4 +106,4 @@ function rbacMatrix() {
   };
 }
 
-module.exports = { authenticate, login, rbacMatrix, issueToken, publicUser };
+module.exports = { authenticate, login, rbacMatrix, issueToken, publicUser, hashPassword };

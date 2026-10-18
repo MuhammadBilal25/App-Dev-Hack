@@ -15,7 +15,24 @@ const POLICIES = {
   'platform.config.read': () => false,
   'league.fixtures.write': (u, league) => u.role === 'league_organizer' && (u.league_ids || []).includes(league.league_id),
   'club.roster.write': (u, club) => u.role === 'club_manager' && u.club_id === club.club_id,
-  'club.products.write': (u, club) => u.role === 'club_manager' && u.club_id === club.club_id,
+  // Store management is a separate permission the Super-Admin can withdraw per manager.
+  'club.products.write': (u, club) => u.role === 'club_manager' && u.club_id === club.club_id && u.store_access !== false,
+  'club.orders.read': (u, club) => u.role === 'club_manager' && u.club_id === club.club_id && u.store_access !== false,
+  'club.update': (u, club) => u.role === 'club_manager' && u.club_id === club.club_id,
+  'club.history.read': (u, club) => u.role === 'club_manager' && u.club_id === club.club_id,
+  // Club creation inside a league follows the Super-Admin's platform setting.
+  'club.create': (u, league) =>
+    u.role === 'league_organizer' && state.settings.organizer_can_create_clubs === true && (u.league_ids || []).includes(league.league_id),
+  // Platform-wide configuration: Super-Admin only (granted before any predicate runs).
+  'sport.manage': () => false,
+  'league.manage': () => false,
+  'user.manage': () => false,
+  'tenant.manage': () => false,
+  'activity.read': () => false,
+  'settings.manage': () => false,
+  'store.config.manage': () => false,
+  'player.private.read': (u, player) =>
+    (u.role === 'club_manager' && u.club_id === player.club_id) || (u.role === 'player' && u.player_id === player.player_id),
   'club.read': () => true, // any role inside the club's tenant
   'player.update': (u, player) =>
     (u.role === 'club_manager' && u.club_id === player.club_id) || (u.role === 'player' && u.player_id === player.player_id),

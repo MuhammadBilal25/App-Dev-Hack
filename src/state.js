@@ -1,6 +1,7 @@
 'use strict';
 
 const seed = require('./seed');
+const platform = require('./platformSeed');
 
 // In-process domain state. The API runs as a single Node process, so synchronous sections are
 // atomic. Durable append-only logs and inventory live in PostgreSQL (see db.js / ADR.md).
@@ -42,6 +43,16 @@ function resetMemory(seedValue) {
   state.offlineProcessed = new Map();
   // Product pinned on a match page: match_id -> product_id
   state.pinned = new Map();
+
+  // Platform layer (production API): sport display metadata, settings, store categories,
+  // discount codes, enriched orders and the platform activity log.
+  state.sportMeta = new Map(Object.entries(platform.SPORT_META).map(([id, m]) => [id, clone(m)]));
+  state.settings = clone(platform.SETTINGS);
+  state.categories = new Map(platform.CATEGORIES.map((c) => [c.category_id, clone(c)]));
+  state.discounts = new Map(Object.entries(seed.DISCOUNTS).map(([code, d]) => [code, { code, ...clone(d), active: true }]));
+  state.prodOrders = new Map();
+  state.activity = [];
+  state.idSeq = 0;
 }
 
 module.exports = { state, resetMemory, clone };

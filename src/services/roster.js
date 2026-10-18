@@ -334,4 +334,34 @@ function addPlayer(leagueId, squadId, { name, position, role }, who) {
   return { player: { player_id: p.player_id, name, position, role, on_loan: false, version: p.audit.length }, audit_entry: clone(entry) };
 }
 
-module.exports = { ROLES, setup, addPlayer, transfer, history, validateTransfer, checkTransfer, applyTransfer, checkTransferReplay, playerVersion, squadMembers };
+// Squad a registered player is in right now (null when released), or undefined if the player is
+// not in the roster engine.
+function currentSquadOf(playerId) {
+  const p = state.rosterPlayers.get(playerId);
+  return p ? latest(p).squad_id : undefined;
+}
+
+// Adds an empty squad to an existing roster league (a club created through the admin API), or
+// creates the roster league when the league has none yet.
+function registerSquad(league, squad) {
+  let rl = state.rosterLeagues.get(league.league_id);
+  if (!rl) {
+    const sport = getSport(league.sport_id);
+    rl = {
+      league_id: league.league_id,
+      tenant_id: league.tenant_id,
+      sport_id: sport.sport_id,
+      transfer_window: clone(league.transfer_window || { open: addDays(today(), -30), close: addDays(today(), 60) }),
+      max_squad_size: isInt(league.max_squad_size) ? league.max_squad_size : sport.roster.max_squad_size,
+      required_positions: clone(sport.roster.required_positions),
+      matches_in_progress: [],
+      squad_ids: [],
+    };
+    state.rosterLeagues.set(rl.league_id, rl);
+  }
+  if (!rl.squad_ids.includes(squad.squad_id)) rl.squad_ids.push(squad.squad_id);
+  state.rosterSquads.set(squad.squad_id, { ...clone(squad), league_id: rl.league_id });
+  return rl;
+}
+
+module.exports = { ROLES, currentSquadOf, registerSquad, setup, addPlayer, transfer, history, validateTransfer, checkTransfer, applyTransfer, checkTransferReplay, playerVersion, squadMembers };

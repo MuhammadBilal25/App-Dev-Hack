@@ -28,7 +28,7 @@ test('tenant, leagues and fixtures come from the demo seed', async () => {
   assert.deepEqual(t, { tenant_id: 'tenant-alpha', name: 'Alpha Sports', colors: { light: '#1D4ED8', dark: '#8AB4FF' }, initials: 'AS', logo_url: null });
 
   const leagues = (await call('GET', '/api/v1/leagues', undefined, h)).body.leagues;
-  assert.deepEqual(leagues.map((l) => l.league_id).sort(), ['league-alpha-1', 'league-alpha-2']);
+  assert.deepEqual(leagues.map((l) => l.league_id).sort(), ['league-alpha-1', 'league-alpha-2', 'league-alpha-volley']);
 
   const fx = (await call('GET', '/api/v1/fixtures?league_id=league-alpha-1', undefined, h)).body.fixtures;
   assert.equal(fx.length, 6);
@@ -43,7 +43,7 @@ test('tenant, leagues and fixtures come from the demo seed', async () => {
   assert.ok(fx.every((f) => f.venue && f.kickoff_at));
 
   const admin = await token('admin@nascon.test');
-  assert.equal((await call('GET', '/api/v1/leagues', undefined, admin)).body.leagues.length, 3);
+  assert.equal((await call('GET', '/api/v1/leagues', undefined, admin)).body.leagues.length, 4);
 });
 
 test('match detail has the timeline with a disallowed goal and a pinned product with stock', async () => {
@@ -93,8 +93,10 @@ test('club profile, catalogue and cross-tenant isolation', async () => {
   }
 
   const cat = (await call('GET', '/api/v1/catalogue', undefined, manager)).body.products;
-  assert.equal(cat[0].variants[0].price_minor, 450000);
-  assert.equal(cat[0].variants[0].stock, 1);
+  const jersey = cat.find((p) => p.product_id === 'prod-jersey-001');
+  assert.equal(jersey.variants[0].price_minor, 450000);
+  assert.equal(jersey.variants[0].stock, 1);
+  assert.ok(cat.every((p) => p.tenant_id === 'tenant-alpha'));
 
   for (const path of ['/api/v1/clubs/club-beta-1', '/api/v1/standings/league-beta-1', '/api/v1/fixtures?league_id=league-beta-1']) {
     const r = await call('GET', path, undefined, manager);

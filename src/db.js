@@ -38,6 +38,11 @@ CREATE TABLE IF NOT EXISTS audit_log (
   entry      JSONB NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+CREATE TABLE IF NOT EXISTS activity_log (
+  activity_id TEXT PRIMARY KEY,
+  entry       JSONB NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 CREATE TABLE IF NOT EXISTS domain_events (
   id         BIGSERIAL PRIMARY KEY,
   topic      TEXT NOT NULL,

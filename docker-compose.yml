@@ -5,15 +5,23 @@ services:
       - "8080:8080"
     environment:
       DAY1_SALT: ${DAY1_SALT}
+      DAY2_SALT: ${DAY2_SALT}
       JWT_SECRET: ${JWT_SECRET:-}
       PORT: "8080"
       DATABASE_URL: postgres://nascon:nascon@postgres:5432/nascon
       REDIS_URL: redis://redis:6379
+      S3_ENDPOINT: http://minio:9000
+      S3_BUCKET: nascon-media
+      S3_ACCESS_KEY: ${MINIO_ROOT_USER:-nascon}
+      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-nascon-minio-secret}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+      # Image uploads wait for MinIO in the background; /health never depends on it.
+      minio:
+        condition: service_started
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
       interval: 5s
@@ -42,3 +50,22 @@ services:
       timeout: 3s
       retries: 30
     restart: unless-stopped
+
+  # Self-hosted S3-compatible object store for product images and logos. Not exposed on the
+  # host: the API streams images to clients through GET /media/{key}.
+  minio:
+    image: bitnamilegacy/minio:2025.7.23-debian-12-r5
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-nascon}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-nascon-minio-secret}
+    volumes:
+      - minio-data:/bitnami/minio/data
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:9000/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+volumes:
+  minio-data:

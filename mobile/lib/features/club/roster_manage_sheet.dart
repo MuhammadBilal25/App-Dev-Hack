@@ -75,7 +75,7 @@ class _RosterManageSheetState extends ConsumerState<RosterManageSheet> {
       setState(() => _error = 'The loan must end after it starts.');
       return;
     }
-    final clubs = ref.read(clubsProvider).value?.data ?? const <ClubRef>[];
+    final clubs = ref.read(clubsProvider).value?.data ?? const <ClubCard>[];
     final toName = clubs.where((c) => c.id == _toClub).map((c) => c.name).firstOrNull ?? _toClub ?? '';
     final verb = switch (_action) {
       RosterAction.transfer => 'Transfer ${p.name} to $toName',
@@ -125,7 +125,8 @@ class _RosterManageSheetState extends ConsumerState<RosterManageSheet> {
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
     final scheme = Theme.of(context).colorScheme;
-    final others = (ref.watch(clubsProvider).value?.data ?? const <ClubRef>[]).where((c) => c.id != widget.club.id).toList();
+    // Players move only between clubs of the same league (one roster registration per league).
+    final others = (ref.watch(clubsProvider).value?.data ?? const <ClubCard>[]).where((c) => c.id != widget.club.id && c.leagueId == widget.club.leagueId).toList();
 
     Widget field(String label, Widget child) => Column(
           crossAxisAlignment: CrossAxisAlignment.start,

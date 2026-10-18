@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../auth/auth_controller.dart';
+import '../cart/cart.dart';
 import '../brand/huddle_mark.dart';
 import '../brand/tenant_logo.dart';
 import '../theme/tenant.dart';
@@ -39,7 +40,7 @@ class TenantAppBar extends ConsumerWidget implements PreferredSizeWidget {
               child: IconButton(
                 tooltip: 'Back',
                 icon: const Icon(Icons.arrow_back),
-                onPressed: () => context.canPop() ? context.pop() : context.go('/fixtures'),
+                onPressed: () => context.canPop() ? context.pop() : context.go('/home'),
               ),
             )
           : null,
@@ -58,12 +59,34 @@ class TenantAppBar extends ConsumerWidget implements PreferredSizeWidget {
               ),
             ),
       actions: [
+        if (user != null) const _CartButton(),
         if (user != null)
           Padding(
             padding: const EdgeInsets.only(right: AppSpace.lg, left: AppSpace.sm),
             child: Center(child: RoleBadge(role: user.role)),
           ),
       ],
+    );
+  }
+}
+
+/// Cart with a count badge, on every signed-in screen.
+class _CartButton extends ConsumerWidget {
+  const _CartButton();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final count = ref.watch(cartCountProvider);
+    return Semantics(
+      identifier: 'app_bar_cart',
+      button: true,
+      label: count == 0 ? 'Cart, empty' : 'Cart, $count ${count == 1 ? 'item' : 'items'}',
+      excludeSemantics: true,
+      child: IconButton(
+        tooltip: 'Cart',
+        onPressed: () => context.push('/cart'),
+        icon: Badge(isLabelVisible: count > 0, label: Text('$count'), child: const Icon(Icons.shopping_cart_outlined)),
+      ),
     );
   }
 }

@@ -29,6 +29,25 @@ automated tests that verify it. Run all tests with `./run_tests.sh`.
 | FR-2.3 | Server-side PDF receipt | `src/lib/pdf.js` (`receiptPdf`) | `tests/store.test.js`: *successful checkout returns a signed receipt and a real PDF* |
 | FR-5.1 | Five-tier RBAC, policy-as-code, negative tests | `src/services/rbac.js` (`POLICIES`, `can`, `guard`), `src/services/auth.js` | `tests/rbac.test.js`: *five-role negative authorization matrix*; *policy layer unit checks* |
 
+## Platform extensions (production API and app)
+
+| Requirement | Implementation | Automated tests |
+|---|---|---|
+| Sports directory; configurable sports (create, update, activate); rules summary generated from config | `src/services/platform.js` (`listSports`, `sportDetail`, `createSport`, `updateSport`, `describeRules`), `src/routes/admin.js`; app `features/sports/`, `features/admin/` | `tests/platform.test.js`: *sports directory…*; *super admin creates, updates and deactivates sports…*; *a mystery sport may take the id of a demo-only sport…* |
+| Leagues and seasons, formats, organizer assignment (multiple leagues), club membership | `src/services/platform.js` (`createLeague`, `assignOrganizer`, `addLeagueClub`), `src/services/views.js` | `tests/platform.test.js`: *leagues: create with season and format…*; *home, search, player profile and role dashboards* |
+| Clubs: create, assign, profile edit, logo, roster history | `src/services/platform.js` (`createClub`, `updateClub`), `src/services/feeds.js` (`clubRosterHistory`), `src/routes/ops.js` | `tests/platform.test.js`: *clubs: admin creates and assigns…*; `tests/merch.test.js`: *product images…* (club and tenant logos) |
+| Users and roles, store-access permission, disabled accounts, tenant branding, settings, activity log | `src/services/platform.js`, `src/services/auth.js`, `src/services/rbac.js`, `src/lib/activity.js` | `tests/platform.test.js`: *users…*; *store access is a separate permission…*; *tenants, branding, settings…* |
+| Fixture generation for real leagues (round robin, Swiss, single / double elimination), bracket advancement | `src/services/schedule.js` (`generate`, `nextSwissRound`, `syncBracket`, `bracketView`) | `tests/schedule.test.js`: *round robin generation…*; *single elimination…*; *double elimination with bracket reset and Swiss rounds…* |
+| Rescheduling with conflict detection (venue, team, rest period, venue hours, player) | `src/services/schedule.js` (`conflictsFor`, `reschedule`) | `tests/schedule.test.js`: *reschedule detects venue, team, rest and venue-hour conflicts…* |
+| Match status machine incl. postponed / cancelled / abandoned | `src/services/schedule.js` (`setStatus`, `assertPlayable`) | `tests/schedule.test.js`: *match status machine…* |
+| Authenticated scoring, compensation, player credit, per-action sync RBAC, same-league transfers | `src/services/matchOps.js`, `src/services/offlineSync.js` (`authorize` hook), `src/routes/ops.js` | `tests/schedule.test.js`: *authenticated scoring…*; *authenticated offline sync rejects actions…* |
+| Product pinning on match pages (real time) | `src/services/matchOps.js` (`pinProduct`) | `tests/schedule.test.js`: *pinning a product to a match page* |
+| Products, variants without assumed sizes, sale and scheduled prices, stock per variant, low stock | `src/services/merch.js`, `src/services/store.js` (`unitPrice`, `setStock`) | `tests/merch.test.js`: *catalogue filters…*; *club manager creates and edits products…* |
+| Image upload to MinIO (type from bytes, 5 MB, primary, removal, media streaming) | `src/lib/storage.js`, `src/services/merch.js` (`storeImage`, `addImage`, `media`), `src/app.js` (`/media`) | `tests/merch.test.js`: *product images…*; live check against MinIO in Docker |
+| Server-priced cart, checkout with customer from the JWT, failures release stock, 20-buyer burst | `src/services/merch.js` (`quote`, `checkout`) | `tests/merch.test.js`: *cart quote…*; *checkout…*; *checkout failures…*; *20 simultaneous app buyers…* |
+| Orders, refunds with restock, receipt signature check, PDF | `src/services/merch.js` (`changeStatus`, `receipt`, `receiptPdfFor`), `src/lib/pdf.js` | `tests/merch.test.js`: *order lifecycle…*; *checkout: server totals, receipt signature, PDF…* |
+| Mobile: role-aware navigation, all flows, offline queue, small screens | `mobile/lib/` | `mobile/test/app_test.dart` (16 tests: login per role, staff tools hidden for viewers, purchase + receipt, organizer scoring online and offline, roster add, product create + photo upload, 360x640 at 1.3x text and landscape) |
+
 ## Non-functional requirements
 
 | ID | Requirement | Implementation | Automated tests |

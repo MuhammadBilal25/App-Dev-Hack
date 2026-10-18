@@ -90,7 +90,9 @@ function processRoster(a) {
   }
 }
 
-function sync(b) {
+// `authorize` (production route only) returns an error code for actions the caller may not
+// perform; those are rejected without touching domain state.
+function sync(b, { authorize = null } = {}) {
   validateEnvelope(b);
   const order = b.actions.map((a, i) => ({ a, i })).sort((x, y) => (x.a.queued_at < y.a.queued_at ? -1 : x.a.queued_at > y.a.queued_at ? 1 : x.i - y.i));
   const results = new Array(b.actions.length);
@@ -105,7 +107,13 @@ function sync(b) {
         : roster.playerVersion(a.payload.player_id);
       r = duplicate(a, v);
     } else {
-      r = a.type === 'score_event' ? processScore(a) : processRoster(a);
+      const denied = authorize ? authorize(a) : null;
+      if (denied) {
+        const v = a.type === 'score_event'
+          ? (state.matches.get(a.payload.match_id) || { events: [] }).events.length
+          : roster.playerVersion(a.payload.player_id);
+        r = rejected(a, denied, v);
+      } else r = a.type === 'score_event' ? processScore(a) : processRoster(a);
       state.offlineProcessed.set(key, clone(r));
     }
     r.processed_order = idx + 1;

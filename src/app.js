@@ -18,6 +18,14 @@ const auth = require('./services/auth');
 const { guard, authorized } = require('./services/rbac');
 const { rateLimit } = require('./middleware/rateLimit');
 const { mobileRouter } = require('./routes/mobile');
+const { opsRouter } = require('./routes/ops');
+const { shopRouter } = require('./routes/shop');
+const { adminRouter } = require('./routes/admin');
+const merch = require('./services/merch');
+const day2 = require('../scenario2/backend');
+
+// Image uploads arrive as raw bytes; every other body is parsed as JSON.
+const isBinary = (req) => /^(image\/|application\/octet-stream)/i.test(req.headers['content-type'] || '');
 
 // Services return { status, body }; this sends it.
 const send = (res, r) => res.status(r.status).json(r.body);
@@ -27,7 +35,17 @@ function createApp() {
   app.disable('x-powered-by');
   app.set('trust proxy', false);
 
-  app.use(express.json({ limit: '1mb', type: () => true }));
+  app.use(express.json({ limit: '1mb', type: (req) => !isBinary(req) }));
+  day2.mountGuards(app);
+
+  // Uploaded images, streamed from object storage. Public (product photos and logos) and outside
+  // /api/v1 so image-heavy screens do not eat into the rate limit.
+  app.get(/^\/media\/(.+)$/, async (req, res) => {
+    const obj = await merch.media(req.params[0]);
+    if (!obj) return res.status(404).json(errorBody(new ApiError(404, 'NOT_FOUND', 'No such image.')));
+    res.set({ 'Content-Type': obj.contentType, 'Cache-Control': 'public, max-age=86400', 'X-Content-Type-Options': 'nosniff' });
+    return res.status(200).send(obj.buffer);
+  });
 
   app.get('/health', async (req, res) => {
     const dbOk = await db.ping();
@@ -65,7 +83,8 @@ function createApp() {
   app.get('/audit/v1/rbac/platform/config', guard('platform.config.read'), authorized);
 
   // ---- Production API for the mobile app: rate limited (100 req / rolling 10 s / IP) ----
-  app.use('/api/v1', rateLimit({ limit: 100, windowMs: 10000 }));
+  // 100 per rolling 10 s is the contract; API_RATE_LIMIT exists only so long test suites can raise it.
+  app.use('/api/v1', rateLimit({ limit: Number(process.env.API_RATE_LIMIT) || 100, windowMs: 10000 }));
   app.get('/api/v1/ping', (req, res) => res.status(200).json({ pong: true }));
   app.post('/api/v1/auth/login', (req, res) => res.status(200).json(auth.login(req.body)));
   app.get('/api/v1/me', (req, res) => res.status(200).json(auth.publicUser(auth.authenticate(req))));
@@ -73,6 +92,12 @@ function createApp() {
   // Realtime stream for the mobile app (SSE): /api/v1/stream?channels=match:m1,league:lg-1
   app.get('/api/v1/stream', (req, res) => realtime.subscribe(req, res));
   app.use('/api/v1', mobileRouter());
+  app.use('/api/v1', opsRouter());
+  app.use('/api/v1', shopRouter());
+  app.use('/api/v1/admin', adminRouter());
+
+  // ---- Day 2 (scenario2/backend): streaming, co-stream, QR, guest cart, moderation, metrics ----
+  day2.mountRoutes(app);
 
   app.use((req, res) => {
     res.status(404).json(errorBody(new ApiError(404, 'NOT_FOUND', `No route for ${req.method} ${req.path}.`)));
@@ -82,7 +107,7 @@ function createApp() {
   app.use((e, req, res, next) => {
     if (e instanceof ApiError) return res.status(e.status).json(errorBody(e));
     if (e && e.type === 'entity.too.large') {
-      return res.status(413).json(errorBody(new ApiError(413, 'PAYLOAD_TOO_LARGE', 'Request body exceeds 1 MB.')));
+      return res.status(413).json(errorBody(new ApiError(413, 'PAYLOAD_TOO_LARGE', isBinary(req) ? 'Images must be 5 MB or smaller.' : 'Request body exceeds 1 MB.')));
     }
     if (e && (e.type === 'entity.parse.failed' || e instanceof SyntaxError)) {
       return res.status(400).json(errorBody(new ApiError(400, 'VALIDATION_ERROR', 'Malformed JSON body.', { fields: ['body'] })));

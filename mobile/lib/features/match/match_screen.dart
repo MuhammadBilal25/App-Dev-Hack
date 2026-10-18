@@ -25,7 +25,11 @@ import '../../core/widgets/sync_strip.dart';
 import '../../core/widgets/underline_tabs.dart';
 import '../../data/models.dart';
 import '../../data/providers.dart';
-import '../store/product_sheet.dart';
+import '../../core/api/api_client.dart';
+import '../../core/api/api_exception.dart';
+import '../../core/connectivity/connectivity.dart';
+import '../../core/widgets/common.dart';
+import '../../core/widgets/remote_image.dart';
 
 /// Creates the long-lived client for the SSE stream (overridden in tests).
 final sseClientFactoryProvider = Provider<http.Client Function()>((ref) => http.Client.new);
@@ -120,8 +124,14 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         if (r.fromCache) const CachedNotice(),
+                        _MatchInfo(fixture: r.data.fixture),
+                        const SizedBox(height: AppSpace.md),
                         if (r.data.canScore && r.data.fixture.status == MatchStatus.live) ...[
                           _ScorePanel(detail: r.data),
+                          const SizedBox(height: AppSpace.lg),
+                        ],
+                        if (r.data.canScore && r.data.allowedStatus.isNotEmpty) ...[
+                          _MatchControl(detail: r.data),
                           const SizedBox(height: AppSpace.lg),
                         ],
                         AnimatedSwitcher(
@@ -133,6 +143,10 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
                         if (r.data.pinned != null) ...[
                           const SizedBox(height: AppSpace.xl),
                           _PinnedProduct(product: r.data.pinned!),
+                        ],
+                        if (r.data.canManage) ...[
+                          const SizedBox(height: AppSpace.md),
+                          _PinControl(detail: r.data),
                         ],
                       ],
                     ),
@@ -187,7 +201,7 @@ class _Hero extends StatelessWidget {
                       ),
                       Expanded(
                         child: Text(
-                          f == null ? 'Match' : '${f.leagueName} · Round ${f.round}',
+                          f == null ? 'Match' : '${f.leagueName} · ${f.stageLabel}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           textAlign: TextAlign.center,
@@ -268,7 +282,7 @@ class _HeroScore extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final dark = Theme.of(context).brightness == Brightness.dark;
     final style = Theme.of(context).textTheme.displayMedium!.copyWith(color: dark ? scheme.onSurface : scheme.onPrimary);
-    final score = f.hasScore ? '${f.home.display} : ${f.away.display}' : DateFormat.Hm().format(f.kickoff);
+    final score = f.hasScore ? '${f.home.display} : ${f.away.display}' : f.status == MatchStatus.upcoming ? DateFormat.Hm().format(f.kickoff) : '– : –';
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpace.sm),
       child: Column(
@@ -293,6 +307,8 @@ class _HeroScore extends StatelessWidget {
             MatchStatus.live => LiveChip(minute: f.minute, onHero: true),
             MatchStatus.completed => const _HeroChip(label: 'Full time'),
             MatchStatus.postponed => const _HeroChip(label: 'Postponed'),
+            MatchStatus.cancelled => const _HeroChip(label: 'Cancelled'),
+            MatchStatus.abandoned => const _HeroChip(label: 'Abandoned'),
             MatchStatus.upcoming => _HeroChip(label: DateFormat('EEE d MMM').format(f.kickoff)),
           },
         ],
@@ -410,6 +426,7 @@ class _TimelineRow extends ConsumerWidget {
                         const TextSpan(text: ' · '),
                         TextSpan(text: e.teamName, style: TextStyle(fontWeight: e.compensated ? FontWeight.w400 : FontWeight.w700)),
                       ],
+                      if (e.playerName != null) TextSpan(text: ' (${e.playerName})'),
                     ],
                   ),
                   style: text.bodyLarge!.copyWith(decoration: strike, color: e.compensated ? muted : null),
@@ -435,8 +452,34 @@ class _TimelineRow extends ConsumerWidget {
 
 }
 
-/// Score entry for the league organizer: team toggle, then one button per scoring event in the
-/// sport config. Each tap is confirmed, then queued as a `score_event` (base_version = match version).
+/// Kick-off, venue and demo label under the hero.
+class _MatchInfo extends StatelessWidget {
+  const _MatchInfo({required this.fixture});
+
+  final Fixture fixture;
+
+  @override
+  Widget build(BuildContext context) {
+    final f = fixture;
+    final text = Theme.of(context).textTheme;
+    return Wrap(
+      spacing: AppSpace.sm,
+      runSpacing: AppSpace.xs,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        Text('${DateFormat('EEE d MMM, HH:mm').format(f.kickoff)} · ${f.venue}', style: text.bodyMedium),
+        if (f.sportName.isNotEmpty) Text('· ${f.sportName}', style: text.bodyMedium),
+        if (f.statusReason != null) StatusChip(kind: StatusKind.warning, label: f.statusReason!, icon: Icons.info_outline),
+        if (f.seeded) const DemoNote(text: 'Demo match from the seed data'),
+      ],
+    );
+  }
+}
+
+/// Score entry for the league organizer, built from the sport's scoring template: points per
+/// event (goals, baskets), innings controls (runs, extras, wickets) or best-of series controls
+/// (sets, games, maps). Every tap is confirmed, then queued as a `score_event` so it also works
+/// offline (base_version = match version).
 class _ScorePanel extends ConsumerStatefulWidget {
   const _ScorePanel({required this.detail});
 
@@ -448,16 +491,18 @@ class _ScorePanel extends ConsumerStatefulWidget {
 
 class _ScorePanelState extends ConsumerState<_ScorePanel> {
   bool _home = true;
+  String? _playerId;
 
-  Future<void> _add(String eventType) async {
+  TeamScore get _team => _home ? widget.detail.fixture.home : widget.detail.fixture.away;
+  List<SquadPlayer> get _squad => _home ? widget.detail.homeSquad : widget.detail.awaySquad;
+
+  Future<void> _send(String type, Map<String, dynamic> payload, {required String what, required String title, String? note}) async {
     final f = widget.detail.fixture;
-    final team = _home ? f.home : f.away;
-    final what = '${humanize(eventType)} for ${team.name}';
     final r = await ConfirmSheet.show(
       context,
       id: 'confirm_score',
-      title: 'Add ${humanize(eventType).toLowerCase()}?',
-      message: '$what${f.minute == null ? '' : " at ${f.minute}'"}. You can correct it later from the timeline.',
+      title: title,
+      message: '$what${f.minute == null ? '' : " at ${f.minute}'"}.${note == null ? '' : ' $note'} You can correct it later from the timeline.',
       confirmLabel: 'Add',
     );
     if (!r.confirmed || !mounted) return;
@@ -467,47 +512,355 @@ class _ScorePanelState extends ConsumerState<_ScorePanel> {
       type: 'score_event',
       baseVersion: f.version,
       label: what,
-      payload: {
-        'event_id': newClientId('ev'),
-        'match_id': f.id,
-        'type': 'score',
-        'payload': {'team_id': team.id, 'event_type': eventType, 'minute': ?f.minute},
-      },
+      payload: {'event_id': newClientId('ev'), 'match_id': f.id, 'type': type, 'payload': payload},
+    );
+  }
+
+  void _score(ScoringEventDef e, {TeamScore? team}) {
+    final t = team ?? _team;
+    final player = team == null ? _squad.where((p) => p.id == _playerId).firstOrNull : null;
+    _send(
+      'score',
+      {'team_id': t.id, 'event_type': e.key, 'minute': ?widget.detail.fixture.minute, 'player_id': ?player?.id},
+      what: '${e.label} for ${t.name}${player == null ? '' : ' (${player.name})'}',
+      title: 'Add ${e.label.toLowerCase()}?',
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final f = widget.detail.fixture;
+    final d = widget.detail;
+    final f = d.fixture;
     final text = Theme.of(context).textTheme;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpace.lg),
-        child: Column(
+    final model = d.scoring.model;
+    return Semantics(
+      identifier: 'score_panel',
+      container: true,
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpace.lg),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Semantics(header: true, child: Text('Score entry', style: text.titleMedium)),
+              Text(
+                switch (model) {
+                  'innings' => 'Innings scoring: runs, extras and wickets for the batting side.',
+                  'round' => 'Series scoring: record each ${d.scoring.events.first.label.toLowerCase()} as it ends.',
+                  _ => 'Tap an event for the selected team.',
+                },
+                style: text.bodySmall!.copyWith(letterSpacing: 0),
+              ),
+              const SizedBox(height: AppSpace.md),
+              if (model == 'round') _series(d) else ...[
+                Semantics(
+                  identifier: 'score_team',
+                  child: SegmentedButton<bool>(
+                    segments: [
+                      ButtonSegment(value: true, label: Text(f.home.name, overflow: TextOverflow.ellipsis)),
+                      ButtonSegment(value: false, label: Text(f.away.name, overflow: TextOverflow.ellipsis)),
+                    ],
+                    selected: {_home},
+                    showSelectedIcon: false,
+                    onSelectionChanged: (s) => setState(() {
+                      _home = s.first;
+                      _playerId = null;
+                    }),
+                  ),
+                ),
+                const SizedBox(height: AppSpace.md),
+                if (model == 'innings') _innings(d) else _events(d),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _events(MatchDetail d) {
+    final f = d.fixture;
+    final level = f.home.score == f.away.score;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (_squad.isNotEmpty) ...[
+          Semantics(
+            identifier: 'score_player',
+            label: 'Credit a player',
+            child: DropdownButtonFormField<String?>(
+              initialValue: _playerId,
+              isExpanded: true,
+              decoration: const InputDecoration(labelText: 'Credit a player (optional)'),
+              items: [
+                const DropdownMenuItem<String?>(value: null, child: Text('No player')),
+                for (final p in _squad) DropdownMenuItem<String?>(value: p.id, child: Text('${p.shirt == null ? '' : '#${p.shirt} '}${p.name}', overflow: TextOverflow.ellipsis)),
+              ],
+              onChanged: (v) => setState(() => _playerId = v),
+            ),
+          ),
+          const SizedBox(height: AppSpace.md),
+        ],
+        Wrap(
+          spacing: AppSpace.sm,
+          runSpacing: AppSpace.sm,
+          children: [
+            for (final e in d.scoring.events)
+              AppButton(id: 'score_add_${e.key}', label: '+ ${e.label}${e.value > 1 ? ' (${e.value})' : ''}', expand: false, onPressed: () => _score(e)),
+            AppButton(
+              id: 'score_discipline',
+              label: 'Card / foul',
+              icon: Icons.style_outlined,
+              variant: AppButtonVariant.secondary,
+              expand: false,
+              onPressed: () => _send('discipline', {'team_id': _team.id, 'points': -1, 'minute': ?f.minute}, what: 'Card for ${_team.name}', title: 'Record a card?', note: 'It costs one fair-play point.'),
+            ),
+            if (!d.scoring.drawAllowed && level && d.tiebreakWinnerId == null)
+              AppButton(
+                id: 'score_tiebreak',
+                label: 'Tie-break winner',
+                icon: Icons.emoji_events_outlined,
+                variant: AppButtonVariant.secondary,
+                expand: false,
+                onPressed: () => _send('tiebreak_winner', {'team_id': _team.id}, what: 'Tie-break won by ${_team.name}', title: 'Record tie-break winner?', note: 'This sport needs a winner.'),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _innings(MatchDetail d) {
+    final text = Theme.of(context).textTheme;
+    final runs = d.scoring.events.where((e) => e.legalBall == true && e.wicket != true).toList()..sort((a, b) => a.value - b.value);
+    final extras = d.scoring.events.where((e) => e.legalBall == false).toList();
+    final wickets = d.scoring.events.where((e) => e.wicket == true).toList();
+    final p = d.scoring.periods;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('${_team.name}: ${_team.display}${_team.overs == null ? '' : ' (${_team.overs} of ${p['overs_per_innings']} overs)'}', style: text.titleSmall),
+        const SizedBox(height: AppSpace.sm),
+        Text('Runs', style: text.labelMedium),
+        const SizedBox(height: AppSpace.xs),
+        Wrap(spacing: AppSpace.sm, runSpacing: AppSpace.sm, children: [
+          for (final e in runs) AppButton(id: 'score_add_${e.key}', label: e.value == 0 ? 'Dot' : '+${e.value}', expand: false, onPressed: () => _score(e)),
+        ]),
+        if (extras.isNotEmpty) ...[
+          const SizedBox(height: AppSpace.md),
+          Text('Extras (ball re-bowled)', style: text.labelMedium),
+          const SizedBox(height: AppSpace.xs),
+          Wrap(spacing: AppSpace.sm, runSpacing: AppSpace.sm, children: [
+            for (final e in extras) AppButton(id: 'score_add_${e.key}', label: '${e.label} +${e.value}', variant: AppButtonVariant.secondary, expand: false, onPressed: () => _score(e)),
+          ]),
+        ],
+        if (wickets.isNotEmpty) ...[
+          const SizedBox(height: AppSpace.md),
+          Wrap(spacing: AppSpace.sm, runSpacing: AppSpace.sm, children: [
+            for (final e in wickets)
+              AppButton(id: 'score_add_${e.key}', label: e.label, icon: Icons.sports_cricket, variant: AppButtonVariant.destructive, expand: false, onPressed: () => _score(e)),
+          ]),
+        ],
+      ],
+    );
+  }
+
+  Widget _series(MatchDetail d) {
+    final f = d.fixture;
+    final text = Theme.of(context).textTheme;
+    final bestOf = d.scoring.bestOf ?? 3;
+    final need = (bestOf + 1) ~/ 2;
+    final decided = f.home.score >= need || f.away.score >= need;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('Best of $bestOf · first to $need · ${f.home.name} ${f.home.score} – ${f.away.score} ${f.away.name}', style: text.titleSmall),
+        const SizedBox(height: AppSpace.sm),
+        if (decided)
+          const StatusChip(kind: StatusKind.success, label: 'Series decided: end the match below', icon: Icons.flag_outlined)
+        else
+          for (final e in d.scoring.events)
+            for (final t in [f.home, f.away])
+              Padding(
+                padding: const EdgeInsets.only(bottom: AppSpace.sm),
+                child: AppButton(id: 'score_add_${e.key}_${t.id}', label: '${e.label}: ${t.name}', onPressed: () => _score(e, team: t)),
+              ),
+      ],
+    );
+  }
+}
+
+/// Start / end the match (queued, works offline) and postpone / cancel / abandon (online).
+class _MatchControl extends ConsumerStatefulWidget {
+  const _MatchControl({required this.detail});
+
+  final MatchDetail detail;
+
+  @override
+  ConsumerState<_MatchControl> createState() => _MatchControlState();
+}
+
+class _MatchControlState extends ConsumerState<_MatchControl> {
+  bool _busy = false;
+
+  Future<void> _event(String type, String label, String message) async {
+    final f = widget.detail.fixture;
+    final r = await ConfirmSheet.show(context, id: 'confirm_$type', title: '$label?', message: message, confirmLabel: label);
+    if (!r.confirmed || !mounted) return;
+    await submitAction(
+      context,
+      ref,
+      type: 'score_event',
+      baseVersion: f.version,
+      label: '$label: ${f.home.name} v ${f.away.name}',
+      payload: {'event_id': newClientId('ev'), 'match_id': f.id, 'type': type, 'payload': <String, dynamic>{}},
+    );
+  }
+
+  Future<void> _status(String to, String label) async {
+    final f = widget.detail.fixture;
+    final messenger = ScaffoldMessenger.of(context);
+    if (!ref.read(isOnlineProvider)) {
+      messenger.showSnackBar(SnackBar(content: Text("You're offline. $label needs a connection; scores can still be entered offline.")));
+      return;
+    }
+    final r = await ConfirmSheet.show(
+      context,
+      id: 'confirm_status_$to',
+      title: '$label this match?',
+      message: 'Everyone following ${f.home.name} v ${f.away.name} sees this at once.',
+      confirmLabel: label,
+      variant: to == 'postponed' ? AppButtonVariant.primary : AppButtonVariant.destructive,
+      reasonLabel: 'Reason',
+    );
+    if (!r.confirmed || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      await ref.read(apiClientProvider).post('/api/v1/matches/${Uri.encodeComponent(f.id)}/status', body: {'status': to, 'reason': r.reason});
+      ref.invalidate(matchProvider(f.id));
+      ref.invalidate(fixturesProvider);
+      messenger.showSnackBar(SnackBar(content: Text('Match ${label.toLowerCase()}ed.'.replaceAll('eed.', 'ed.')), duration: AppMotion.snackbar));
+    } on ApiException catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final allowed = widget.detail.allowedStatus;
+    final text = Theme.of(context).textTheme;
+    return Semantics(
+      identifier: 'match_control',
+      container: true,
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpace.lg),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Semantics(header: true, child: Text('Match control', style: text.titleMedium)),
+              const SizedBox(height: AppSpace.sm),
+              if (allowed.contains('in_progress'))
+                AppButton(id: 'match_start', label: 'Start match', icon: Icons.play_arrow, onPressed: () => _event('match_start', 'Start match', 'The match goes live and score entry opens.')),
+              if (allowed.contains('completed'))
+                AppButton(id: 'match_end', label: 'End match (full time)', icon: Icons.flag_outlined, onPressed: () => _event('match_end', 'End match', 'The result becomes final and the standings update.')),
+              const SizedBox(height: AppSpace.sm),
+              Wrap(
+                spacing: AppSpace.sm,
+                runSpacing: AppSpace.sm,
+                children: [
+                  if (allowed.contains('postponed')) OutlinedButton.icon(onPressed: _busy ? null : () => _status('postponed', 'Postpone'), icon: const Icon(Icons.pause_circle_outline), label: const Text('Postpone')),
+                  if (allowed.contains('upcoming')) OutlinedButton.icon(onPressed: _busy ? null : () => _status('upcoming', 'Restore'), icon: const Icon(Icons.restore), label: const Text('Restore')),
+                  if (allowed.contains('cancelled')) OutlinedButton.icon(onPressed: _busy ? null : () => _status('cancelled', 'Cancel'), icon: const Icon(Icons.cancel_outlined), label: const Text('Cancel')),
+                  if (allowed.contains('abandoned')) OutlinedButton.icon(onPressed: _busy ? null : () => _status('abandoned', 'Abandon'), icon: const Icon(Icons.report_outlined), label: const Text('Abandon')),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Organizer pins a product to the match page; connected fans see it at once (SSE).
+class _PinControl extends ConsumerWidget {
+  const _PinControl({required this.detail});
+
+  final MatchDetail detail;
+
+  Future<void> _pin(BuildContext context, WidgetRef ref, String? productId) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(apiClientProvider).post('/api/v1/matches/${Uri.encodeComponent(detail.fixture.id)}/pin', body: {'product_id': productId});
+      ref.invalidate(matchProvider(detail.fixture.id));
+      messenger.showSnackBar(SnackBar(content: Text(productId == null ? 'Product unpinned.' : 'Product pinned to this match.'), duration: AppMotion.snackbar));
+    } on ApiException catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Row(
+      children: [
+        Expanded(
+          child: OutlinedButton.icon(
+            onPressed: () async {
+              final chosen = await showModalBottomSheet<String>(
+                context: context,
+                isScrollControlled: true,
+                useSafeArea: true,
+                builder: (_) => const _PinPicker(),
+              );
+              if (chosen != null && context.mounted) await _pin(context, ref, chosen);
+            },
+            icon: const Icon(Icons.push_pin_outlined),
+            label: Text(detail.pinned == null ? 'Pin a product' : 'Change pinned product'),
+          ),
+        ),
+        if (detail.pinned != null) ...[
+          const SizedBox(width: AppSpace.sm),
+          TextButton(onPressed: () => _pin(context, ref, null), child: const Text('Unpin')),
+        ],
+      ],
+    );
+  }
+}
+
+class _PinPicker extends ConsumerWidget {
+  const _PinPicker();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final value = ref.watch(catalogueProvider);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(AppSpace.lg, 0, AppSpace.lg, AppSpace.lg),
+      child: AsyncView<Catalogue>(
+        id: 'pin_picker',
+        value: value,
+        onRetry: () => ref.invalidate(catalogueProvider),
+        builder: (c) => Column(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Semantics(header: true, child: Text('Score entry', style: text.titleMedium)),
-            const SizedBox(height: AppSpace.md),
-            Semantics(
-              identifier: 'score_team',
-              child: SegmentedButton<bool>(
-                segments: [
-                  ButtonSegment(value: true, label: Text(f.home.name, overflow: TextOverflow.ellipsis)),
-                  ButtonSegment(value: false, label: Text(f.away.name, overflow: TextOverflow.ellipsis)),
+            Text('Pin a product', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: AppSpace.sm),
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                children: [
+                  for (final p in c.products)
+                    ListTile(
+                      leading: ClipRRect(borderRadius: BorderRadius.circular(AppRadius.sm), child: SizedBox.square(dimension: 44, child: ProductImageBox(imageUrl: p.imageUrl, category: p.category, iconSize: 24))),
+                      title: Text(p.name),
+                      subtitle: Text('${p.clubName} · ${formatPrice(p.fromPriceMinor)}'),
+                      onTap: () => Navigator.of(context).pop(p.id),
+                    ),
                 ],
-                selected: {_home},
-                showSelectedIcon: false,
-                onSelectionChanged: (s) => setState(() => _home = s.first),
               ),
-            ),
-            const SizedBox(height: AppSpace.md),
-            Wrap(
-              spacing: AppSpace.sm,
-              runSpacing: AppSpace.sm,
-              children: [
-                for (final e in widget.detail.scoringEvents)
-                  AppButton(id: 'score_add_$e', label: '+ ${humanize(e)}', expand: false, onPressed: () => _add(e)),
-              ],
             ),
           ],
         ),
@@ -515,6 +868,7 @@ class _ScorePanelState extends ConsumerState<_ScorePanel> {
     );
   }
 }
+
 
 class _LineUps extends ConsumerWidget {
   const _LineUps({super.key, required this.detail});
@@ -579,12 +933,16 @@ class _PinnedProduct extends StatelessWidget {
       child: Row(
         children: [
           ExcludeSemantics(
-            child: Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(color: scheme.primaryContainer, borderRadius: BorderRadius.circular(AppRadius.md)),
-              alignment: Alignment.center,
-              child: JerseyIcon(size: 34, color: scheme.primary),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              child: SizedBox(
+                width: 56,
+                height: 56,
+                child: RemoteImage(
+                  path: product.imageUrl,
+                  fallback: Container(color: scheme.primaryContainer, alignment: Alignment.center, child: JerseyIcon(size: 34, color: scheme.primary)),
+                ),
+              ),
             ),
           ),
           const SizedBox(width: AppSpace.md),
@@ -606,7 +964,7 @@ class _PinnedProduct extends StatelessWidget {
             label: product.soldOut ? 'Sold out' : 'Buy ${product.name}',
             excludeSemantics: true,
             child: FilledButton(
-              onPressed: product.soldOut ? null : () => showProductSheet(context, product),
+              onPressed: product.soldOut ? null : () => context.push('/product/${Uri.encodeComponent(product.id)}'),
               style: FilledButton.styleFrom(
                 backgroundColor: scheme.tertiary,
                 foregroundColor: scheme.onTertiary,

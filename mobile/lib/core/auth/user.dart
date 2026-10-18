@@ -17,12 +17,16 @@ enum UserRole {
 }
 
 class Tenant {
-  const Tenant({required this.id, required this.name, this.logoUrl, this.primaryColor});
+  const Tenant({required this.id, required this.name, this.logoUrl, this.primaryColor, this.darkColor, this.custom = false});
 
   final String id;
   final String name;
   final String? logoUrl;
   final String? primaryColor;
+  final String? darkColor;
+
+  /// True when the Super-Admin changed the tenant's colours: they then replace the built-in brand.
+  final bool custom;
 
   factory Tenant.fromJson(Map<String, dynamic> j) {
     final colors = j['colors'];
@@ -31,6 +35,8 @@ class Tenant {
       name: (j['name'] as String?) ?? (j['tenant_id'] as String),
       logoUrl: j['logo_url'] as String?,
       primaryColor: colors is Map ? colors['primary'] as String? : null,
+      darkColor: colors is Map ? colors['dark'] as String? : null,
+      custom: j['brand_custom'] == true,
     );
   }
 
@@ -38,7 +44,8 @@ class Tenant {
         'tenant_id': id,
         'name': name,
         'logo_url': logoUrl,
-        'colors': {'primary': primaryColor},
+        'colors': {'primary': primaryColor, 'dark': darkColor},
+        'brand_custom': custom,
       };
 }
 
@@ -54,6 +61,7 @@ class AppUser {
     this.leagueIds = const [],
     this.clubId,
     this.playerId,
+    this.storeAccess = false,
   });
 
   final String id;
@@ -65,6 +73,9 @@ class AppUser {
   final List<String> leagueIds;
   final String? clubId;
   final String? playerId;
+
+  /// Club Managers can manage their club's store only when the Super-Admin grants it.
+  final bool storeAccess;
 
   bool get isSuperAdmin => role == UserRole.superAdmin;
 
@@ -88,6 +99,7 @@ class AppUser {
       leagueIds: ((j['league_ids'] as List?) ?? const []).whereType<String>().toList(),
       clubId: j['club_id'] as String?,
       playerId: j['player_id'] as String?,
+      storeAccess: j['store_access'] == true,
     );
   }
 
@@ -101,5 +113,6 @@ class AppUser {
         'league_ids': leagueIds,
         'club_id': clubId,
         'player_id': playerId,
+        'store_access': storeAccess,
       };
 }

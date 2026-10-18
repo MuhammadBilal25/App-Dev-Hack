@@ -3,6 +3,7 @@
 // Test harness: the API runs in-process on a random port; PostgreSQL is replaced by a tiny
 // in-memory fake that understands the handful of statements the services issue.
 process.env.DAY1_SALT = process.env.DAY1_SALT || 'demo-salt';
+process.env.DAY2_SALT = process.env.DAY2_SALT || 'T01D27ad7ffff12e';
 process.env.JWT_SECRET = 'test-secret';
 delete process.env.REDIS_URL;
 
@@ -19,7 +20,13 @@ function fakeQuery(sql, params = [], journal = null) {
       inventory.get(id).reserved -= q;
     }
   } else if (s.startsWith('TRUNCATE')) inventory.clear();
-  else if (s.startsWith('INSERT INTO inventory')) inventory.set(params[0], { stock: params[1], reserved: params[2] ?? 0 });
+  else if (s.startsWith('INSERT INTO inventory')) {
+    if (!(s.includes('ON CONFLICT') && inventory.has(params[0]))) inventory.set(params[0], { stock: params[1], reserved: params[2] ?? 0 });
+  } else if (s.startsWith('UPDATE inventory SET stock = $2')) {
+    inventory.get(params[0]).stock = params[1];
+  } else if (s.startsWith('UPDATE inventory SET stock = stock + $2') && !s.includes('reserved')) {
+    inventory.get(params[0]).stock += params[1];
+  }
   else if (s.startsWith('UPDATE inventory SET stock = stock - $2')) {
     const row = inventory.get(params[0]);
     if (!row || row.stock < params[1]) return { rowCount: 0, rows: [] };
@@ -71,7 +78,7 @@ async function call(method, path, body, headers = {}) {
   const r = await fetch(base + path, {
     method,
     headers: { 'content-type': 'application/json', ...headers },
-    body: body === undefined ? undefined : typeof body === 'string' ? body : JSON.stringify(body),
+    body: body === undefined ? undefined : typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body),
   });
   const text = await r.text();
   let json = null;
@@ -93,4 +100,11 @@ async function playFootball(matchId, home, away, hg, ag, goalIds = []) {
   return ev(matchId, 'match_end', {});
 }
 
-module.exports = { start, stop, call, ev, playFootball };
+// Authorization header for a demo account (all share the demo password).
+async function login(email) {
+  const r = await call('POST', '/api/v1/auth/login', { email, password: 'Nascon@26' });
+  if (r.status !== 200) throw new Error(`login failed for ${email}: ${r.status}`);
+  return { authorization: `Bearer ${r.body.token}` };
+}
+
+module.exports = { start, stop, call, ev, playFootball, login };

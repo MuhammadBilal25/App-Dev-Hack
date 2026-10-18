@@ -9,12 +9,12 @@ const root = path.resolve(__dirname, '..');
 const summary = JSON.parse(fs.readFileSync(path.join(root, 'coverage', 'coverage-summary.json'), 'utf8'));
 
 const AREAS = {
-  fixtures: ['src/services/fixtures/'],
-  scoring: ['src/services/scoring.js', 'src/services/sports.js', 'src/services/leagues.js', 'src/lib/crypto.js'],
+  fixtures: ['src/services/fixtures/', 'src/services/schedule.js'],
+  scoring: ['src/services/scoring.js', 'src/services/sports.js', 'src/services/leagues.js', 'src/lib/crypto.js', 'src/services/matchOps.js'],
   standings: ['src/services/standings.js'],
-  store: ['src/services/store.js', 'src/lib/pdf.js'],
+  store: ['src/services/store.js', 'src/lib/pdf.js', 'src/services/merch.js', 'src/routes/shop.js'],
   roster: ['src/services/roster.js', 'src/services/offlineSync.js'],
-  rbac: ['src/services/rbac.js', 'src/services/auth.js', 'src/middleware/rateLimit.js'],
+  rbac: ['src/services/rbac.js', 'src/services/auth.js', 'src/middleware/rateLimit.js', 'src/services/platform.js', 'src/routes/admin.js'],
 };
 
 const out = {};

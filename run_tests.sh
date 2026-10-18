@@ -10,6 +10,6 @@ fi
 
 [ -d node_modules/c8 ] || npm ci --no-audit --no-fund
 
-npx c8 --reporter=text --reporter=json-summary --reporter=html node --test tests/*.test.js
+npx c8 --reporter=text --reporter=json-summary --reporter=html node --test tests/*.test.js scenario2/backend/tests/*.test.js
 node scripts/coverage-areas.js
 echo "HTML coverage report: coverage/index.html"

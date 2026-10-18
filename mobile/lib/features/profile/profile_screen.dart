@@ -74,20 +74,70 @@ class ProfileScreen extends ConsumerWidget {
             ),
           ),
         ),
-        if (user.role == UserRole.player) ...[
-          const SectionLabel('My profile'),
-          Card(
-            child: Semantics(
-              identifier: 'profile_my_player',
-              child: ListTile(
-                minTileHeight: AppSize.rowMin,
-                leading: const Icon(Icons.sports_soccer),
-                title: const Text('My player profile'),
-                subtitle: Text(user.playerId ?? 'Not linked to a player yet'),
+        const SectionLabel('My activity'),
+        Card(
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            children: [
+              Semantics(
+                identifier: 'profile_orders',
+                button: true,
+                child: ListTile(
+                  minTileHeight: AppSize.rowMin,
+                  leading: const Icon(Icons.receipt_long_outlined),
+                  title: const Text('My orders and receipts'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push('/orders'),
+                ),
               ),
-            ),
+              if (user.role == UserRole.player && user.playerId != null)
+                Semantics(
+                  identifier: 'profile_my_player',
+                  button: true,
+                  child: ListTile(
+                    minTileHeight: AppSize.rowMin,
+                    leading: const Icon(Icons.sports_soccer),
+                    title: const Text('My player profile'),
+                    subtitle: const Text('Stats, club and roster history'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => context.push('/player/${user.playerId}'),
+                  ),
+                ),
+              if (user.clubId != null)
+                ListTile(
+                  minTileHeight: AppSize.rowMin,
+                  leading: const Icon(Icons.shield_outlined),
+                  title: const Text('My club'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push(user.role == UserRole.clubManager ? '/manage/club' : '/club/${user.clubId}'),
+                ),
+              if (user.role == UserRole.leagueOrganizer || user.isSuperAdmin)
+                Semantics(
+                  identifier: 'profile_my_leagues',
+                  button: true,
+                  child: ListTile(
+                    minTileHeight: AppSize.rowMin,
+                    leading: const Icon(Icons.sports_score_outlined),
+                    title: Text(user.isSuperAdmin ? 'Leagues: fixtures and scoring' : 'My leagues: fixtures and scoring'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => context.push('/manage/organizer'),
+                  ),
+                ),
+              if (user.isSuperAdmin)
+                Semantics(
+                  identifier: 'profile_admin',
+                  button: true,
+                  child: ListTile(
+                    minTileHeight: AppSize.rowMin,
+                    leading: const Icon(Icons.admin_panel_settings_outlined),
+                    title: const Text('Platform admin'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => context.push('/admin'),
+                  ),
+                ),
+            ],
           ),
-        ],
+        ),
         const SectionLabel('Sync'),
         Card(
           clipBehavior: Clip.antiAlias,

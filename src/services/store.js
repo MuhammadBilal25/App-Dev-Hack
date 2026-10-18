@@ -2,7 +2,6 @@
 
 const { pool } = require('../db');
 const { state, clone } = require('../state');
-const { DISCOUNTS } = require('../seed');
 const { ApiError, err, validation, errorBody } = require('../lib/errors');
 const { canonical, sign } = require('../lib/crypto');
 const { isObj, isInt, isStr, isId, nowIso } = require('../lib/validate');
@@ -37,7 +36,28 @@ function validateCheckout(b) {
   if (bad.length) throw validation(bad);
 }
 
-// Mock payment gateway: authorize then capture.
+// Effective unit price of a variant right now: the latest scheduled price already in force (or the
+// list price), lowered by a sale price when one is set. Baseline variants have neither.
+function unitPrice(v) {
+  let price = v.price_minor;
+  const now = Date.now();
+  let at = -Infinity;
+  for (const s of v.price_schedule || []) {
+    const t = Date.parse(s.effective_at);
+    if (t <= now && t >= at) {
+      at = t;
+      price = s.price_minor;
+    }
+  }
+  return Number.isInteger(v.sale_price_minor) && v.sale_price_minor < price ? v.sale_price_minor : price;
+}
+
+const activeDiscount = (code) => {
+  const d = state.discounts.get(code);
+  return d && d.active !== false ? d : null;
+};
+
+// Mock payment gateway: authorize then capture; refunds reverse a capture.
 const gateway = {
   authorize(token) {
     if (token === 'tok_success' || token === 'tok_capture_fail') return { ok: true, authorization_id: `auth_${++state.paymentSeq}` };
@@ -46,6 +66,9 @@ const gateway = {
   capture(token) {
     if (token === 'tok_success') return { ok: true, capture_id: `cap_${state.paymentSeq}` };
     return { ok: false };
+  },
+  refund(captureId) {
+    return { ok: !!captureId, refund_id: `ref_${++state.paymentSeq}` };
   },
 };
 
@@ -91,10 +114,10 @@ async function processCheckout(b) {
   const lines = b.items.map((it) => ({
     variant_id: it.variant_id,
     quantity: it.quantity,
-    unit_price_minor: state.variants.get(it.variant_id).price_minor,
+    unit_price_minor: unitPrice(state.variants.get(it.variant_id)),
   }));
   const subtotal = lines.reduce((s, l) => s + l.unit_price_minor * l.quantity, 0);
-  const discount = b.discount_code ? Math.floor((subtotal * DISCOUNTS[b.discount_code].percent) / 100) : 0;
+  const discount = b.discount_code ? Math.floor((subtotal * activeDiscount(b.discount_code).percent) / 100) : 0;
 
   await reserve(lines);
 
@@ -121,7 +144,8 @@ async function processCheckout(b) {
     currency: 'PKR',
     paid_at: nowIso(),
   };
-  const pdf = await receiptPdf(payload);
+  const signature = sign(b.order_id, payload);
+  const pdf = await receiptPdf(payload, { signature, lines: describeLines ? describeLines(lines) : null });
   const body = {
     order_id: b.order_id,
     status: 'paid',
@@ -131,7 +155,7 @@ async function processCheckout(b) {
     discount_minor: discount,
     total_minor: payload.total_minor,
     payment: { authorization_id: auth.authorization_id, capture_id: cap.capture_id, state: 'captured' },
-    receipt: { payload, signature: sign(b.order_id, payload), pdf_base64: pdf.toString('base64') },
+    receipt: { payload, signature, pdf_base64: pdf.toString('base64') },
   };
   queue.emit('order.status_changed', { order_id: b.order_id, from: 'pending', to: 'paid', at: payload.paid_at });
   for (const l of lines) realtime.publish('store', 'inventory_changed', { variant_id: l.variant_id });
@@ -150,7 +174,7 @@ async function checkout(b) {
   for (const it of b.items) {
     if (!state.variants.has(it.variant_id)) throw err(404, 'VARIANT_NOT_FOUND', `Variant ${it.variant_id} does not exist.`, { variant_id: it.variant_id });
   }
-  if (b.discount_code !== undefined && b.discount_code !== null && !DISCOUNTS[b.discount_code]) {
+  if (b.discount_code !== undefined && b.discount_code !== null && !activeDiscount(b.discount_code)) {
     throw err(400, 'INVALID_DISCOUNT_CODE', `Discount code ${b.discount_code} is not valid.`, { discount_code: b.discount_code });
   }
 
@@ -196,8 +220,33 @@ function transitionOrder(orderId, to) {
   return { order_id: orderId, status: to };
 }
 
+// Puts refunded or cancelled units back on sale.
+async function restock(items) {
+  for (const it of items) {
+    await pool.query('UPDATE inventory SET stock = stock + $2 WHERE variant_id = $1', [it.variant_id, it.quantity]);
+  }
+}
+
+// Sets the units available for sale (inventory management). Units held by in-flight checkouts
+// stay in `reserved` and are unaffected.
+async function setStock(variantId, stock) {
+  await pool.query('UPDATE inventory SET stock = $2 WHERE variant_id = $1', [variantId, stock]);
+}
+
+async function addInventory(variantId, stock) {
+  await pool.query('INSERT INTO inventory (variant_id, stock, reserved) VALUES ($1, $2, 0) ON CONFLICT (variant_id) DO NOTHING', [variantId, stock]);
+}
+
+// Optional human-readable line labels for the PDF (product name, size, colour), set by the
+// production store. The signed payload is unaffected.
+let describeLines = null;
+const setLineDescriber = (fn) => { describeLines = fn; };
+
 function catalogue(tenantId) {
   return [...state.products.values()].filter((p) => !tenantId || p.tenant_id === tenantId).map(clone);
 }
 
-module.exports = { checkout, inventory, transitionOrder, catalogue, ORDER_TRANSITIONS };
+module.exports = {
+  checkout, inventory, transitionOrder, catalogue, ORDER_TRANSITIONS, unitPrice, activeDiscount, gateway, restock, setStock, addInventory,
+  setLineDescriber,
+};

@@ -28,7 +28,7 @@ extension on FixtureFilter {
         FixtureFilter.all => true,
         FixtureFilter.live => f.status == MatchStatus.live,
         FixtureFilter.upcoming => f.status == MatchStatus.upcoming || f.status == MatchStatus.postponed,
-        FixtureFilter.results => f.status == MatchStatus.completed,
+        FixtureFilter.results => f.status == MatchStatus.completed || f.status == MatchStatus.cancelled || f.status == MatchStatus.abandoned,
       };
 }
 
@@ -180,17 +180,22 @@ class _FilterChips extends StatelessWidget {
 
 /// One fixture: status column on the left, two team rows with scores on the right.
 class FixtureRow extends StatelessWidget {
-  const FixtureRow({super.key, required this.fixture});
+  const FixtureRow({super.key, required this.fixture, this.showLeague = false});
 
   final Fixture fixture;
+
+  /// Adds a "League · Stage" line (lists that mix competitions).
+  final bool showLeague;
 
   @override
   Widget build(BuildContext context) {
     final f = fixture;
     final status = switch (f.status) {
-      MatchStatus.live => 'live, minute ${f.minute ?? ''}',
+      MatchStatus.live => f.minute == null ? 'live' : 'live, minute ${f.minute}',
       MatchStatus.completed => 'full time',
       MatchStatus.postponed => 'postponed',
+      MatchStatus.cancelled => 'cancelled',
+      MatchStatus.abandoned => 'abandoned',
       MatchStatus.upcoming => 'kick-off ${DateFormat.Hm().format(f.kickoff)}',
     };
     final score = f.hasScore ? ', ${f.home.display} to ${f.away.display}' : '';
@@ -212,6 +217,22 @@ class FixtureRow extends StatelessWidget {
                 Expanded(
                   child: Column(
                     children: [
+                      if (showLeague)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: AppSpace.xs),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  '${f.leagueName} · ${f.stageLabel}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.bodySmall!.copyWith(letterSpacing: 0),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       _TeamLine(team: f.home, fixture: f),
                       const SizedBox(height: AppSpace.sm),
                       _TeamLine(team: f.away, fixture: f),
@@ -247,7 +268,7 @@ class _StatusColumn extends StatelessWidget {
               child: Row(children: [LiveDot(color: live), const SizedBox(width: 5), Text('LIVE', style: text.labelSmall!.copyWith(color: live))]),
             ),
             const SizedBox(height: 2),
-            Text("${fixture.minute ?? ''}'", style: text.bodyMedium!.copyWith(color: live, fontWeight: FontWeight.w800, fontFeatures: AppFonts.tabular)),
+            Text(fixture.minute == null ? 'Now' : "${fixture.minute}'", style: text.bodyMedium!.copyWith(color: live, fontWeight: FontWeight.w800, fontFeatures: AppFonts.tabular)),
           ],
         ),
       MatchStatus.completed => Column(
@@ -257,16 +278,26 @@ class _StatusColumn extends StatelessWidget {
             Text('Done', style: text.labelSmall!.copyWith(color: muted, fontWeight: FontWeight.w500)),
           ],
         ),
-      MatchStatus.postponed => Column(
+      MatchStatus.postponed || MatchStatus.cancelled || MatchStatus.abandoned => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(color: context.status.warning.bg, borderRadius: BorderRadius.circular(AppRadius.sm)),
-              child: Text('PPD', style: text.labelSmall!.copyWith(color: context.status.warning.fg)),
+              decoration: BoxDecoration(
+                color: fixture.status == MatchStatus.postponed ? context.status.warning.bg : context.status.neutral.bg,
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+              ),
+              child: Text(
+                switch (fixture.status) {
+                  MatchStatus.postponed => 'PPD',
+                  MatchStatus.cancelled => 'CXL',
+                  _ => 'ABD',
+                },
+                style: text.labelSmall!.copyWith(color: fixture.status == MatchStatus.postponed ? context.status.warning.fg : context.status.neutral.fg),
+              ),
             ),
             const SizedBox(height: 2),
-            Text('Postponed', style: text.labelSmall!.copyWith(color: muted, fontWeight: FontWeight.w500)),
+            Text(statusLabel(fixture.status), style: text.labelSmall!.copyWith(color: muted, fontWeight: FontWeight.w500)),
           ],
         ),
       MatchStatus.upcoming => Column(

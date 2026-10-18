@@ -5,7 +5,8 @@ const { state, resetMemory } = require('../state');
 const seed = require('../seed');
 const { validation } = require('../lib/errors');
 const { isInt } = require('../lib/validate');
-const { applyDemo } = require('../demo');
+const { applyDemo, DEMO_STOCK } = require('../demo');
+const { resetDay2 } = require('../../scenario2/backend/shared/seed');
 
 function parseResetBody(body) {
   const b = body && typeof body === 'object' && !Array.isArray(body) ? body : {};
@@ -43,8 +44,12 @@ async function doReset(seedValue, stock) {
   const c = await pool.connect();
   try {
     await c.query('BEGIN');
-    await c.query('TRUNCATE inventory, orders, match_events, audit_log, domain_events RESTART IDENTITY');
+    await c.query('TRUNCATE inventory, orders, match_events, audit_log, domain_events, activity_log RESTART IDENTITY');
     for (const [variantId, qty] of Object.entries(stock)) {
+      await c.query('INSERT INTO inventory (variant_id, stock, reserved) VALUES ($1, $2, 0)', [variantId, qty]);
+    }
+    // Demo store products (not part of the reset response).
+    for (const [variantId, qty] of Object.entries(DEMO_STOCK)) {
       await c.query('INSERT INTO inventory (variant_id, stock, reserved) VALUES ($1, $2, 0)', [variantId, qty]);
     }
     await c.query('COMMIT');
@@ -56,6 +61,7 @@ async function doReset(seedValue, stock) {
   }
   resetMemory(seedValue);
   applyDemo();
+  resetDay2();
   state.ready = true;
   return {
     status: 'reset_complete',

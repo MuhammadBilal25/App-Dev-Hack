@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app.dart';
 import 'core/cache/api_cache.dart';
+import 'core/cart/cart.dart';
 import 'core/settings/settings.dart';
 import 'core/sync/sync_queue.dart';
 
@@ -13,6 +14,7 @@ Future<void> main() async {
   await Hive.initFlutter();
   final box = await Hive.openBox<String>(syncBoxName);
   final cache = await Hive.openBox<String>(cacheBoxName);
+  final cart = await Hive.openBox<String>(cartBoxName);
   final prefs = await SharedPreferences.getInstance();
   runApp(
     ProviderScope(
@@ -20,6 +22,7 @@ Future<void> main() async {
         sharedPrefsProvider.overrideWithValue(prefs),
         syncBoxProvider.overrideWithValue(box),
         cacheBoxProvider.overrideWithValue(cache),
+        cartBoxProvider.overrideWithValue(cart),
       ],
       child: const HuddleApp(),
     ),
