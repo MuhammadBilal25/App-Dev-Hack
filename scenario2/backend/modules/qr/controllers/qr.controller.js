@@ -12,4 +12,6 @@ const exportQr = async (req, res) => {
 
 const redirect = (req, res) => res.redirect(302, service.redirectTarget(req.params.shortCode, req.headers['user-agent']));
 
-module.exports = { resolve, exportQr, redirect };
+const setMatchStatus = (req, res) => send(res, service.setMatchStatus(req.params.matchId, req.body));
+
+module.exports = { resolve, exportQr, redirect, setMatchStatus };

@@ -21,11 +21,24 @@ function subscribe(req, res) {
   });
 }
 
+// Other transports (the Day 2 WebSocket hub) register here to receive every published event.
+const listeners = new Set();
+const onPublish = (fn) => listeners.add(fn);
+
 function publish(channel, type, data) {
   const frame = `event: ${type}\ndata: ${JSON.stringify({ channel, type, data })}\n\n`;
   for (const s of subscribers) {
     if (s.channels.includes('*') || s.channels.includes(channel)) s.res.write(frame);
   }
+  for (const fn of listeners) {
+    try {
+      fn(channel, type, data);
+    } catch {
+      // A failing listener never breaks the publishing request.
+    }
+  }
 }
 
-module.exports = { subscribe, publish };
+const sseCount = () => subscribers.size;
+
+module.exports = { subscribe, publish, onPublish, sseCount };

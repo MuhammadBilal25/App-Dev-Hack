@@ -1,0 +1,1589 @@
+{
+  "info": {
+    "name": "NaSCon 26 - Day 2 (Scenario 2)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Day 2 endpoints. Run folders top to bottom (folder 1 resets). The expected status (and error code) is in each request name and is asserted automatically. Signatures use DAY2_SALT from the server .env."
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "guestToken",
+      "value": "guest_anon_tok_7721"
+    }
+  ],
+  "event": [
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const m = pm.info.requestName.match(/->\\s*(\\d{3})(?:\\s+([A-Z_]{3,}))?/);",
+          "if (m) {",
+          "  pm.test(`status is ${m[1]}`, () => pm.response.to.have.status(Number(m[1])));",
+          "  if (m[2]) pm.test(`error code is ${m[2]}`, () => pm.expect(pm.response.json().error.code).to.eql(m[2]));",
+          "}",
+          "if (pm.response.code < 300 && (pm.response.headers.get(\"Content-Type\") || \"\").includes(\"json\")) {",
+          "  const b = pm.response.json();",
+          "  if (b.signature !== undefined) pm.test(\"signature is 64 lowercase hex\", () => pm.expect(b.signature).to.match(/^[a-f0-9]{64}$/));",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Setup",
+      "item": [
+        {
+          "name": "Health -> 200",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Reset (Day 1 + Day 2 baseline) -> 200",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/reset",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "reset"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "description": "Seeds match-m1 (in_progress 1-0), player-beta-2, QR m1-live / p-alpha-1 / c-alpha-1, guest_anon_tok_7721 and an empty cart for player-alpha-1."
+          }
+        },
+        {
+          "name": "Score of match-m1 (1 - 0) -> 200",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/score/match-m1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "score",
+                "match-m1"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Stream keys (5.4)",
+      "item": [
+        {
+          "name": "Rotate with override -> 200",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/stream/key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "stream",
+                "key"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"rotate\",\n  \"player_id\": \"player-alpha-1\",\n  \"label\": \"OBS-Main-Desk\",\n  \"stream_key_override\": \"sk_live_9f83a1b2c3d4e5f6\"\n}"
+            },
+            "description": "Use rtmp://localhost:1935/live/sk_live_9f83a1b2c3d4e5f6 in OBS."
+          }
+        },
+        {
+          "name": "Media hook: active key may publish -> 200",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/internal/media/auth",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "internal",
+                "media",
+                "auth"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"publish\",\n  \"path\": \"live/sk_live_9f83a1b2c3d4e5f6\"\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Generate new key -> 201",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/stream/key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "stream",
+                "key"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"generate\",\n  \"player_id\": \"player-alpha-2\"\n}"
+            },
+            "description": "Random sk_live_ + 16 hex."
+          }
+        },
+        {
+          "name": "Revoke -> 200",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/stream/key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "stream",
+                "key"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"revoke\",\n  \"player_id\": \"player-alpha-1\"\n}"
+            },
+            "description": "status revoked, ingest_endpoints and playback_url null."
+          }
+        },
+        {
+          "name": "Media hook: revoked key -> 409 KEY_REVOKED",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/internal/media/auth",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "internal",
+                "media",
+                "auth"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"publish\",\n  \"path\": \"live/sk_live_9f83a1b2c3d4e5f6\"\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Revoke again (no key) -> 404 STREAM_NOT_FOUND",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/stream/key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "stream",
+                "key"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"revoke\",\n  \"player_id\": \"player-alpha-1\"\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Bad action -> 400 VALIDATION_ERROR",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/stream/key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "stream",
+                "key"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"pause\",\n  \"player_id\": \"player-alpha-1\"\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Unknown player -> 404 PLAYER_NOT_FOUND",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/stream/key",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "stream",
+                "key"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"generate\",\n  \"player_id\": \"player-ghost\"\n}"
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Co-stream (5.5)",
+      "item": [
+        {
+          "name": "4-way, host drops -> 201",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/costream/session",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "costream",
+                "session"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"session_id\": \"cs-session-101\",\n  \"host_player_id\": \"player-alpha-1\",\n  \"participants\": [\n    \"player-alpha-1\",\n    \"player-alpha-2\",\n    \"player-beta-1\",\n    \"player-beta-2\"\n  ],\n  \"layout\": \"grid_4\",\n  \"simulate_host_drop\": true\n}"
+            },
+            "description": "active_host player-alpha-2, handoff_occurred true, participant_count 3."
+          }
+        },
+        {
+          "name": "Same request again (idempotent) -> 200",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/costream/session",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "costream",
+                "session"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"session_id\": \"cs-session-101\",\n  \"host_player_id\": \"player-alpha-1\",\n  \"participants\": [\n    \"player-alpha-1\",\n    \"player-alpha-2\",\n    \"player-beta-1\",\n    \"player-beta-2\"\n  ],\n  \"layout\": \"grid_4\",\n  \"simulate_host_drop\": true\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "No drop -> 201",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/costream/session",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "costream",
+                "session"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"session_id\": \"cs-session-102\",\n  \"host_player_id\": \"player-alpha-1\",\n  \"participants\": [\n    \"player-alpha-1\",\n    \"player-alpha-2\",\n    \"player-beta-1\",\n    \"player-beta-2\"\n  ],\n  \"layout\": \"grid_4\",\n  \"simulate_host_drop\": false\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Sole host drops (terminated) -> 201",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/costream/session",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "costream",
+                "session"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"session_id\": \"cs-session-103\",\n  \"host_player_id\": \"player-alpha-1\",\n  \"participants\": [\n    \"player-alpha-1\"\n  ],\n  \"layout\": \"solo\",\n  \"simulate_host_drop\": true\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Host not in participants -> 400 VALIDATION_ERROR",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/costream/session",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "costream",
+                "session"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"session_id\": \"cs-x\",\n  \"host_player_id\": \"player-beta-1\",\n  \"participants\": [\n    \"player-alpha-1\",\n    \"player-alpha-2\"\n  ],\n  \"layout\": \"grid_4\",\n  \"simulate_host_drop\": true\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Unknown participant -> 404 PLAYER_NOT_FOUND",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/costream/session",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "costream",
+                "session"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"session_id\": \"cs-x\",\n  \"host_player_id\": \"player-alpha-1\",\n  \"participants\": [\n    \"player-alpha-1\",\n    \"player-ghost\"\n  ],\n  \"layout\": \"grid_4\",\n  \"simulate_host_drop\": true\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "grid_2 with 3 left -> 400 UNSUPPORTED_LAYOUT",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/costream/session",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "costream",
+                "session"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"session_id\": \"cs-x\",\n  \"host_player_id\": \"player-alpha-1\",\n  \"participants\": [\n    \"player-alpha-1\",\n    \"player-alpha-2\",\n    \"player-beta-1\",\n    \"player-beta-2\"\n  ],\n  \"layout\": \"grid_2\",\n  \"simulate_host_drop\": true\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "QR for the co-stream -> 200",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/qr/cs-session-101?inspect=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "qr",
+                "cs-session-101"
+              ],
+              "query": [
+                {
+                  "key": "inspect",
+                  "value": "true"
+                }
+              ]
+            },
+            "description": "target_route /web/costream/cs-session-101"
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Dynamic QR (5.6)",
+      "item": [
+        {
+          "name": "Resolve match-m1 (live) -> 200",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/qr/match-m1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "qr",
+                "match-m1"
+              ]
+            },
+            "description": "scan_count goes up by 1 each time."
+          }
+        },
+        {
+          "name": "Inspect (no scan counted) -> 200",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/qr/match-m1?inspect=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "qr",
+                "match-m1"
+              ],
+              "query": [
+                {
+                  "key": "inspect",
+                  "value": "true"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Short link redirect -> 302",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/q/m1-live",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "q",
+                "m1-live"
+              ]
+            },
+            "description": "Turn off \"Automatically follow redirects\" in Postman settings to see the 302 and Location header."
+          }
+        },
+        {
+          "name": "Export SVG -> 200",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/qr/match-m1/export.svg",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "qr",
+                "match-m1",
+                "export.svg"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Export PNG -> 200",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/qr/match-m1/export.png",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "qr",
+                "match-m1",
+                "export.png"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Export PDF poster -> 200",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/qr/match-m1/export.pdf",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "qr",
+                "match-m1",
+                "export.pdf"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Export GIF -> 400 VALIDATION_ERROR",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/qr/match-m1/export.gif",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "qr",
+                "match-m1",
+                "export.gif"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Player QR -> 200",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/qr/player-alpha-1?inspect=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "qr",
+                "player-alpha-1"
+              ],
+              "query": [
+                {
+                  "key": "inspect",
+                  "value": "true"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Club QR -> 200",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/qr/club-alpha-1?inspect=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "qr",
+                "club-alpha-1"
+              ],
+              "query": [
+                {
+                  "key": "inspect",
+                  "value": "true"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Unknown entity -> 404 QR_NOT_FOUND",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/qr/match-ghost",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "qr",
+                "match-ghost"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Edge 2: end match-m1 -> 201",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/events",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "events"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event_id\": \"pm-end-m1\",\n  \"match_id\": \"match-m1\",\n  \"type\": \"match_end\",\n  \"payload\": {}\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Edge 2: same short_url, route now /vod -> 200",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/qr/match-m1?inspect=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "qr",
+                "match-m1"
+              ],
+              "query": [
+                {
+                  "key": "inspect",
+                  "value": "true"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Edge 2: postpone match-m1 (helper) -> 200",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/matches/match-m1/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "matches",
+                "match-m1",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"postponed\"\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Edge 2: route now /notice?state=postponed -> 200",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/qr/match-m1?inspect=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "qr",
+                "match-m1"
+              ],
+              "query": [
+                {
+                  "key": "inspect",
+                  "value": "true"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Clear the postponed helper -> 200",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/matches/match-m1/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "matches",
+                "match-m1",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": null\n}"
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Guest boundary + cart merge (5.7)",
+      "item": [
+        {
+          "name": "Reset -> 200",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/reset",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "reset"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Guest posts chat -> 403 GUEST_WRITE_FORBIDDEN",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{guestToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/chat",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "chat"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"chat_room_id\": \"chat-cs-session-101\",\n  \"text\": \"hello\"\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Guest checkout -> 403 GUEST_WRITE_FORBIDDEN",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{guestToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/checkout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "checkout"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_id\": \"o-guest\"\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Guest score event -> 403 GUEST_WRITE_FORBIDDEN",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{guestToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/events",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "events"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event_id\": \"g1\"\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "No token chat -> 403 GUEST_WRITE_FORBIDDEN",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/chat",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "chat"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"chat_room_id\": \"chat-cs-session-101\",\n  \"text\": \"hello\"\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Guest can read -> 200",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{guestToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/score/match-m1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "score",
+                "match-m1"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Merge guest cart -> 200",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/guest/cart-merge",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "guest",
+                "cart-merge"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"guest_token\": \"guest_anon_tok_7721\",\n  \"registered_user_id\": \"player-alpha-1\",\n  \"guest_cart\": [\n    {\n      \"variant_id\": \"var-jersey-001-L\",\n      \"quantity\": 1\n    }\n  ],\n  \"test_write_block\": true\n}"
+            },
+            "description": "total_items 1, write_rejection_code 403."
+          }
+        },
+        {
+          "name": "Edge 4: replay same merge -> 200",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/guest/cart-merge",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "guest",
+                "cart-merge"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"guest_token\": \"guest_anon_tok_7721\",\n  \"registered_user_id\": \"player-alpha-1\",\n  \"guest_cart\": [\n    {\n      \"variant_id\": \"var-jersey-001-L\",\n      \"quantity\": 1\n    }\n  ],\n  \"test_write_block\": true\n}"
+            },
+            "description": "Still total_items 1 (never 2)."
+          }
+        },
+        {
+          "name": "Same token, other user -> 409 GUEST_TOKEN_ALREADY_MERGED",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/guest/cart-merge",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "guest",
+                "cart-merge"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"guest_token\": \"guest_anon_tok_7721\",\n  \"registered_user_id\": \"player-alpha-2\",\n  \"guest_cart\": [\n    {\n      \"variant_id\": \"var-jersey-001-L\",\n      \"quantity\": 1\n    }\n  ],\n  \"test_write_block\": true\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Too many M (stock 1) -> 409 OUT_OF_STOCK",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/guest/cart-merge",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "guest",
+                "cart-merge"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"guest_token\": \"guest_pm_2\",\n  \"registered_user_id\": \"player-alpha-1\",\n  \"guest_cart\": [\n    {\n      \"variant_id\": \"var-jersey-001-M\",\n      \"quantity\": 2\n    }\n  ],\n  \"test_write_block\": true\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Unknown variant -> 404 VARIANT_NOT_FOUND",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/guest/cart-merge",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "guest",
+                "cart-merge"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"guest_token\": \"guest_pm_3\",\n  \"registered_user_id\": \"player-alpha-1\",\n  \"guest_cart\": [\n    {\n      \"variant_id\": \"var-ghost\",\n      \"quantity\": 1\n    }\n  ],\n  \"test_write_block\": true\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Unknown user -> 404 PLAYER_NOT_FOUND",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/guest/cart-merge",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "guest",
+                "cart-merge"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"guest_token\": \"guest_pm_4\",\n  \"registered_user_id\": \"player-ghost\",\n  \"guest_cart\": [\n    {\n      \"variant_id\": \"var-jersey-001-L\",\n      \"quantity\": 1\n    }\n  ],\n  \"test_write_block\": true\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Token without guest_ prefix -> 400 VALIDATION_ERROR",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/guest/cart-merge",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "guest",
+                "cart-merge"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"guest_token\": \"anon_1\",\n  \"registered_user_id\": \"player-alpha-1\",\n  \"guest_cart\": [\n    {\n      \"variant_id\": \"var-jersey-001-L\",\n      \"quantity\": 1\n    }\n  ],\n  \"test_write_block\": true\n}"
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Moderation + DLQ (5.8)",
+      "item": [
+        {
+          "name": "Spec example -> 200",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/moderation/test",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "moderation",
+                "test"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"chat_room_id\": \"chat-cs-session-101\",\n  \"incoming_messages\": [\n    {\n      \"message_id\": \"msg-1\",\n      \"sender\": \"user-guest-1\",\n      \"text\": \"Clean sports commentary\"\n    },\n    {\n      \"message_id\": \"msg-2\",\n      \"sender\": \"user-spammer\",\n      \"text\": \"Watch this illegal stream b@d_w0rd now!\"\n    },\n    {\n      \"message_id\": \"msg-3\",\n      \"sender\": \"user-flooder\",\n      \"text\": \"GOAL! AAAA!!!\"\n    }\n  ],\n  \"check_dlq\": true,\n  \"simulate_failed_notifications\": 0\n}"
+            },
+            "description": "msg-2 masked to ***, user-spammer kicked, user-flooder muted, msg-3 dropped."
+          }
+        },
+        {
+          "name": "Leetspeak set -> 200",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/moderation/test",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "moderation",
+                "test"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"chat_room_id\": \"room-leet\",\n  \"incoming_messages\": [\n    {\n      \"message_id\": \"pm-l-0\",\n      \"sender\": \"user-0\",\n      \"text\": \"p.0.r.n\"\n    },\n    {\n      \"message_id\": \"pm-l-1\",\n      \"sender\": \"user-1\",\n      \"text\": \"s!c@m\"\n    },\n    {\n      \"message_id\": \"pm-l-2\",\n      \"sender\": \"user-2\",\n      \"text\": \"f*u*c*k\"\n    },\n    {\n      \"message_id\": \"pm-l-3\",\n      \"sender\": \"user-3\",\n      \"text\": \"a$$h0le\"\n    },\n    {\n      \"message_id\": \"pm-l-4\",\n      \"sender\": \"user-4\",\n      \"text\": \"idiot_spam\"\n    }\n  ],\n  \"check_dlq\": true,\n  \"simulate_failed_notifications\": 0\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Rate limit: 5 fast messages -> 200",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/moderation/test",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "moderation",
+                "test"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"chat_room_id\": \"room-rate\",\n  \"incoming_messages\": [\n    {\n      \"message_id\": \"pm-r-0\",\n      \"sender\": \"user-fast\",\n      \"text\": \"hello 0\"\n    },\n    {\n      \"message_id\": \"pm-r-1\",\n      \"sender\": \"user-fast\",\n      \"text\": \"hello 1\"\n    },\n    {\n      \"message_id\": \"pm-r-2\",\n      \"sender\": \"user-fast\",\n      \"text\": \"hello 2\"\n    },\n    {\n      \"message_id\": \"pm-r-3\",\n      \"sender\": \"user-fast\",\n      \"text\": \"hello 3\"\n    },\n    {\n      \"message_id\": \"pm-r-4\",\n      \"sender\": \"user-fast\",\n      \"text\": \"hello 4\"\n    }\n  ],\n  \"check_dlq\": true,\n  \"simulate_failed_notifications\": 0\n}"
+            },
+            "description": "Only 3 broadcast; user-fast muted."
+          }
+        },
+        {
+          "name": "Simulate 2 failed notifications -> 200",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/moderation/test",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "moderation",
+                "test"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"chat_room_id\": \"room-dlq\",\n  \"incoming_messages\": [],\n  \"check_dlq\": true,\n  \"simulate_failed_notifications\": 2\n}"
+            },
+            "description": "dlq_status.queue_depth 2, attempts 3 each."
+          }
+        },
+        {
+          "name": "Bad body -> 400 VALIDATION_ERROR",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/moderation/test",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "moderation",
+                "test"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"chat_room_id\": \"x\",\n  \"incoming_messages\": [\n    {\n      \"message_id\": \"a\"\n    }\n  ]\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Chat history (read) -> 200",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/chat/chat-cs-session-101",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "chat",
+                "chat-cs-session-101"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Observability + privacy (5.9)",
+      "item": [
+        {
+          "name": "Prometheus metrics -> 200",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/metrics",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "metrics"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Erase player-alpha-1 -> 200",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/privacy/user/player-alpha-1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "privacy",
+                "user",
+                "player-alpha-1"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Erase unknown -> 404 PLAYER_NOT_FOUND",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/privacy/user/player-ghost",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "privacy",
+                "user",
+                "player-ghost"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Reset (restore player-alpha-1) -> 200",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/reset",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "reset"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "description": ""
+          }
+        }
+      ]
+    }
+  ]
+}

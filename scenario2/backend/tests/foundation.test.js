@@ -49,20 +49,3 @@ test('guest tokens can still read', async () => {
   const r = await call('GET', '/audit/v1/score/match-m1', undefined, GUEST);
   assert.strictEqual(r.status, 200);
 });
-
-test('Day 2 routes are mounted (stubs answer 501 until implemented)', async () => {
-  const probes = [
-    ['POST', '/audit/v1/stream/key', {}],
-    ['POST', '/audit/v1/costream/session', {}],
-    ['GET', '/audit/v1/qr/match-m1'],
-    ['POST', '/audit/v1/guest/cart-merge', {}],
-    ['POST', '/audit/v1/moderation/test', {}],
-    ['GET', '/metrics'],
-    ['DELETE', '/audit/v1/privacy/user/player-alpha-1'],
-  ];
-  for (const [method, path, body] of probes) {
-    const r = await call(method, path, body);
-    assert.strictEqual(r.status, 501, `${method} ${path}`);
-    assert.strictEqual(r.body.error.code, 'NOT_IMPLEMENTED');
-  }
-});

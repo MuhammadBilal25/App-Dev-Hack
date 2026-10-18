@@ -1,6 +1,6 @@
 'use strict';
 
-// Live WebSocket clients per match: match_id -> Set<socket>
+// Live WebSocket clients per channel ("match:<id>", "chat:<room>", "costream:<id>") -> Set<socket>
 function createStore() {
   return { byMatch: new Map() };
 }

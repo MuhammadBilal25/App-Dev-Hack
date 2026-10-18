@@ -1,9 +1,11 @@
 'use strict';
 
 // Dynamic QR mappings. byEntity: entity_id -> { entity_id, short_code, short_url, scan_count }
-// byCode: short_code -> entity_id. scans: privacy-safe telemetry (device family + UTC bucket only).
+// byCode: short_code -> entity_id.
+// scans: privacy-safe telemetry only: { entity_id, device_family, bucket } (no IP, UA or cookies).
+// statusOverride: match_id -> postponed / cancelled / abandoned set through the Day 2 helper.
 function createStore() {
-  return { byEntity: new Map(), byCode: new Map(), scans: [] };
+  return { byEntity: new Map(), byCode: new Map(), scans: [], statusOverride: new Map() };
 }
 
 function addMapping(store, entityId, shortCode, baseUrl) {
