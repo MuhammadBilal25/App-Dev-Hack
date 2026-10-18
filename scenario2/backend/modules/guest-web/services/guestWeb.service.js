@@ -160,4 +160,36 @@ async function mergeAfterLogin(req) {
   return guestCart.cartMerge({ guest_token: b.guest_token, registered_user_id: user.user_id, guest_cart: items, test_write_block: false });
 }
 
-module.exports = { issueToken, matchView, costreamView, playerView, clubView, stageItem, getCart, mergeAfterLogin };
+// ---- Signed-in member cart (server side, same cart the merge fills) ----
+const memberCarts = () => state.day2.guestCart.carts;
+
+// GET /api/v1/member-cart
+function memberCart(req) {
+  const user = auth.authenticate(req);
+  return { status: 200, body: guestCart.cartView(user.user_id) };
+}
+
+// POST /api/v1/member-cart { variant_id, quantity }
+function memberAdd(req) {
+  const user = auth.authenticate(req);
+  const b = req.body;
+  if (!isObj(b) || !isStr(b.variant_id)) throw validation(['variant_id']);
+  if (b.quantity !== undefined && !(isInt(b.quantity) && b.quantity >= 1 && b.quantity <= 10)) throw validation(['quantity']);
+  const v = state.variants.get(b.variant_id);
+  if (!v) throw err(404, 'VARIANT_NOT_FOUND', `Variant ${b.variant_id} does not exist.`, { variant_id: b.variant_id });
+  const cart = memberCarts().get(user.user_id) || { user_id: user.user_id, items: [] };
+  const line = cart.items.find((it) => it.variant_id === b.variant_id);
+  if (line) line.quantity = Math.min(10, line.quantity + (b.quantity || 1));
+  else cart.items.push({ variant_id: b.variant_id, quantity: b.quantity || 1, unit_price_minor: v.price_minor });
+  memberCarts().set(user.user_id, cart);
+  return { status: 200, body: guestCart.cartView(user.user_id) };
+}
+
+// POST /api/v1/member-cart/clear (after a paid checkout)
+function memberClear(req) {
+  const user = auth.authenticate(req);
+  memberCarts().set(user.user_id, { user_id: user.user_id, items: [] });
+  return { status: 200, body: guestCart.cartView(user.user_id) };
+}
+
+module.exports = { issueToken, matchView, costreamView, playerView, clubView, stageItem, getCart, mergeAfterLogin, memberCart, memberAdd, memberClear };

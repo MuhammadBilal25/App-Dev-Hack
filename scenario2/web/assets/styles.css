@@ -64,3 +64,11 @@ label { display: block; margin: 12px 0 4px; color: var(--muted); }
 .modal p { margin: 0; color: var(--muted); }
 .modal-actions { display: flex; gap: 8px; margin-top: 16px; }
 [hidden] { display: none !important; }
+
+.top-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: flex-end; }
+.top { flex-wrap: wrap; gap: 8px; }
+.btn.small { min-height: 48px; padding: 0 12px; font-size: 14px; }
+.who-name { color: var(--muted); font-size: 14px; }
+.qr-img { display: block; width: min(280px, 70vw); height: auto; margin: 12px auto; background: #fff; border-radius: 8px; padding: 8px; }
+.links a { color: #9cc2ff; }
+.preview { width: 100%; max-height: 320px; background: #000; border-radius: 10px; margin: 8px 0; }

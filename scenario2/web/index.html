@@ -12,6 +12,13 @@
   <header class="top">
     <span class="brand">NaSCon <strong>Live</strong></span>
     <span id="status-chip" class="chip" role="status" aria-live="polite"></span>
+    <nav class="top-actions" aria-label="Account">
+      <button id="qr-btn" class="btn small" type="button" aria-haspopup="dialog">QR code</button>
+      <button id="golive-btn" class="btn small" type="button" hidden>Go live</button>
+      <span id="who" class="who-name" hidden></span>
+      <button id="signin-btn" class="btn small" type="button">Sign in</button>
+      <button id="signout-btn" class="btn small" type="button" hidden>Sign out</button>
+    </nav>
   </header>
 
   <main id="main" tabindex="-1">
@@ -54,6 +61,17 @@
       </form>
     </section>
 
+    <section id="golive" class="card" aria-labelledby="golive-title" hidden>
+      <h2 id="golive-title">Go live from this browser</h2>
+      <p class="price">Uses your camera and microphone (WebRTC WHIP to the media server). Viewers watch on this match page.</p>
+      <video id="golive-preview" class="preview" autoplay muted playsinline aria-label="Your camera preview"></video>
+      <p id="golive-status" class="price" role="status" aria-live="polite">Not live.</p>
+      <div class="merch-actions">
+        <button id="golive-start" class="btn primary" type="button">Start broadcast</button>
+        <button id="golive-stop" class="btn" type="button" disabled>Stop and revoke key</button>
+      </div>
+    </section>
+
     <p id="toast" class="toast" role="status" aria-live="polite" hidden></p>
   </main>
 
@@ -73,6 +91,14 @@
         <button id="auth-cancel" class="btn" type="button">Not now</button>
       </div>
     </form>
+  </div>
+
+  <div id="qr-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="qr-title" hidden>
+    <h2 id="qr-title">Scan to open</h2>
+    <p>Scan with a phone camera or the NaSCon app (Scan a QR code).</p>
+    <img id="qr-img" class="qr-img" alt="QR code for this page">
+    <p class="links"><a id="qr-png" href="#" download>PNG</a> · <a id="qr-svg" href="#" download>SVG</a> · <a id="qr-pdf" href="#" target="_blank" rel="noopener">Print poster (PDF)</a></p>
+    <div class="modal-actions"><button id="qr-close" class="btn" type="button">Close</button></div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js" defer></script>

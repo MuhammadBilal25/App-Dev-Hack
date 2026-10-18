@@ -75,6 +75,24 @@ class _LiveMatchScreenState extends ConsumerState<LiveMatchScreen> {
           onPressed: () => context.canPop() ? context.pop() : context.go('/home'),
         ),
         title: Text(m == null ? 'Match' : '${m['home']['name']} vs ${m['away']['name']}', overflow: TextOverflow.ellipsis),
+        actions: [
+          IconButton(
+            tooltip: 'Show QR code',
+            icon: const Icon(Icons.qr_code_2),
+            onPressed: () => showDialog<void>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Text('Scan to open'),
+                content: Semantics(
+                  identifier: 'entity_qr_code',
+                  child: Image.network('$server/audit/v1/qr/${Uri.encodeComponent(widget.matchId)}/export.png', width: 240, height: 240,
+                      errorBuilder: (_, _, _) => const Text('QR code could not load.')),
+                ),
+                actions: [TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Close'))],
+              ),
+            ),
+          ),
+        ],
       ),
       body: Semantics(
         identifier: 'match_live_screen',

@@ -68,6 +68,24 @@ class _CostreamScreenState extends ConsumerState<CostreamScreen> {
           onPressed: () => context.canPop() ? context.pop() : context.go('/home'),
         ),
         title: const Text('Co-stream'),
+        actions: [
+          IconButton(
+            tooltip: 'Show QR code',
+            icon: const Icon(Icons.qr_code_2),
+            onPressed: () => showDialog<void>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Text('Scan to open'),
+                content: Semantics(
+                  identifier: 'entity_qr_code',
+                  child: Image.network('$server/audit/v1/qr/${Uri.encodeComponent(widget.sessionId)}/export.png', width: 240, height: 240,
+                      errorBuilder: (_, _, _) => const Text('QR code could not load.')),
+                ),
+                actions: [TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Close'))],
+              ),
+            ),
+          ),
+        ],
       ),
       body: Semantics(
         identifier: 'costream_screen',

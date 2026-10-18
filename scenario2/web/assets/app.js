@@ -56,9 +56,19 @@
   }
 
   // ---------------- video ----------------
-  function play(url) {
+  // Media URLs say "localhost"; on a phone that is the phone, so use this page's host instead.
+  function mediaUrl(url) {
+    try {
+      const u = new URL(url);
+      if (u.hostname === 'localhost' || u.hostname === '127.0.0.1') u.hostname = location.hostname;
+      return u.toString();
+    } catch { return url; }
+  }
+
+  function play(rawUrl) {
     const video = $('video');
-    if (!url) return;
+    if (!rawUrl) return;
+    const url = mediaUrl(rawUrl);
     if (window.Hls && window.Hls.isSupported()) {
       const hls = new window.Hls({ lowLatencyMode: true });
       hls.loadSource(url);
@@ -158,12 +168,31 @@
 
   // ---------------- cart ----------------
   async function refreshCart() {
+    if (memberToken) return refreshMemberCart();
     if (!guestToken) return;
     const r = await api('GET', '/api/v1/guest/cart', undefined, guestToken);
     if (r.status === 200) $('cart-count').textContent = String(r.data.count);
   }
 
+  // Cart: guests stage on the server under their guest token; signed-in members use their
+  // account cart, which is the same cart the guest cart merges into.
+  async function refreshMemberCart() {
+    const r = await api('GET', '/api/v1/member-cart', undefined, memberToken);
+    if (r.status === 401) return signOut(true);
+    if (r.status === 200) $('cart-count').textContent = String(r.data.total_items);
+    return r.data;
+  }
+
   async function addToCart() {
+    if (memberToken) {
+      const r = await api('POST', '/api/v1/member-cart', { variant_id: pinnedVariant, quantity: 1 }, memberToken);
+      if (r.status === 200) {
+        $('cart-count').textContent = String(r.data.total_items);
+        toast('Added to your cart.');
+      } else if (r.status === 401) signOut(true);
+      else toast('Could not add to cart.');
+      return;
+    }
     const token = await ensureGuest();
     const r = await api('POST', '/api/v1/guest/cart', { variant_id: pinnedVariant, quantity: 1 }, token);
     if (r.status === 200) {
@@ -180,11 +209,30 @@
     }
   }
 
+  // Pays with the demo card through the same checkout API the mobile app uses, so the order
+  // shows up in the app under Profile > My orders.
   async function checkout() {
     if (!memberToken) return openModal('checkout');
-    const r = await mergeCart();
-    const n = r && r.active_cart ? r.active_cart.total_items : 0;
-    toast(`Your account cart has ${n} item${n === 1 ? '' : 's'}. Finish paying in the NaSCon app.`);
+    await mergeCart();
+    const cart = await refreshMemberCart();
+    if (!cart || cart.items.length === 0) return toast('Your cart is empty. Add the pinned jersey first.');
+    const total = (cart.subtotal_minor / 100).toFixed(2);
+    const n = cart.total_items;
+    if (!window.confirm('Pay PKR ' + total + ' for ' + n + (n === 1 ? ' item' : ' items') + ' with the demo card?')) return;
+    const orderId = 'web-' + Date.now().toString(36);
+    const r = await api('POST', '/api/v1/checkout', {
+      order_id: orderId,
+      items: cart.items.map((it) => ({ variant_id: it.variant_id, quantity: it.quantity })),
+      payment: { token: 'tok_success' },
+    }, memberToken);
+    if (r.status === 201 || r.status === 200) {
+      await api('POST', '/api/v1/member-cart/clear', {}, memberToken);
+      $('cart-count').textContent = '0';
+      toast('Paid. Order ' + r.data.order_id + ' for PKR ' + (r.data.total_minor / 100).toFixed(2) + '. It is also in the app under My orders.');
+    } else {
+      const e = r.data && r.data.error;
+      toast(e && e.code === 'OUT_OF_STOCK' ? 'Sorry, that size just sold out.' : (e && e.message) || 'Payment failed.');
+    }
   }
 
   async function mergeCart() {
@@ -195,18 +243,47 @@
       guestToken = null;
       store.set('guest_token', '');
       await ensureGuest();
-      $('cart-count').textContent = '0';
     }
+    if (r.data.active_cart) $('cart-count').textContent = String(r.data.active_cart.total_items);
     return r.data;
+  }
+
+  // ---------------- account ----------------
+  function currentUser() {
+    try { return JSON.parse(store.get('member_user') || 'null'); } catch { return null; }
+  }
+
+  function renderAccount() {
+    const u = memberToken ? currentUser() : null;
+    $('who').hidden = !u;
+    $('who').textContent = u ? u.name : '';
+    $('signin-btn').hidden = !!u;
+    $('signout-btn').hidden = !u;
+    $('golive-btn').hidden = !(u && u.player_id);
+  }
+
+  function signOut(expired) {
+    memberToken = null;
+    store.set('member_token', '');
+    store.set('member_user', '');
+    stopBroadcast(false);
+    $('golive').hidden = true;
+    renderAccount();
+    renderAccount();
+  if (memberToken) refreshMemberCart().catch(() => {});
+  else ensureGuest().then(refreshCart).catch(() => {});
+    toast(expired ? 'Your session ended. Sign in again.' : 'Signed out.');
   }
 
   // ---------------- progressive auth modal ----------------
   function openModal(reason) {
     lastFocus = document.activeElement;
     store.set('resume_at', String($('video').currentTime || 0));
-    $('auth-desc').textContent = reason === 'checkout'
-      ? 'Sign in to check out. Your cart is kept and moves to your account.'
-      : 'Sign in to chat. Your cart is kept and moves to your account.';
+    const text = {
+      checkout: 'Sign in to check out. Your cart is kept and moves to your account.',
+      account: 'Sign in to chat, check out or go live.',
+    };
+    $('auth-desc').textContent = text[reason] || 'Sign in to chat. Your cart is kept and moves to your account.';
     $('auth-error').hidden = true;
     $('auth-backdrop').hidden = false;
     $('auth-modal').hidden = false;
@@ -215,6 +292,7 @@
 
   function closeModal() {
     $('auth-modal').hidden = true;
+    $('qr-modal').hidden = true;
     $('auth-backdrop').hidden = true;
     if (lastFocus && lastFocus.focus) lastFocus.focus();
   }
@@ -229,17 +307,97 @@
     }
     memberToken = r.data.token;
     store.set('member_token', memberToken);
+    store.set('member_user', JSON.stringify(r.data.user));
     const merged = await mergeCart();
+    await refreshMemberCart();
+    renderAccount();
     closeModal();
     // Back to the exact playback position (FR-4.4).
     const at = Number(store.get('resume_at') || 0);
     if (at > 0) $('video').currentTime = at;
     const n = merged && merged.active_cart ? merged.active_cart.total_items : 0;
-    toast(`Signed in as ${r.data.user.name}.${merged && merged.cart_merged ? ` ${n} item${n === 1 ? '' : 's'} moved to your account.` : ''}`);
+    const moved = merged && merged.cart_merged ? ' ' + n + (n === 1 ? ' item' : ' items') + ' moved to your account.' : '';
+    toast('Signed in as ' + r.data.user.name + '.' + moved);
     if (pendingChat) {
       const text = pendingChat;
       pendingChat = null;
       await sendChat(text);
+    }
+  }
+
+  // ---------------- QR code for this page ----------------
+  function openQr() {
+    lastFocus = document.activeElement;
+    const base = '/audit/v1/qr/' + encodeURIComponent(entityId) + '/export';
+    $('qr-img').src = base + '.svg';
+    $('qr-png').href = base + '.png';
+    $('qr-svg').href = base + '.svg';
+    $('qr-pdf').href = base + '.pdf';
+    $('auth-backdrop').hidden = false;
+    $('qr-modal').hidden = false;
+    $('qr-close').focus();
+  }
+
+  // ---------------- go live: browser camera -> WebRTC WHIP -> MediaMTX ----------------
+  let pc = null;
+  let camera = null;
+
+  async function startBroadcast() {
+    const u = currentUser();
+    if (!u || !u.player_id) return toast('Only players can go live.');
+    if (!navigator.mediaDevices || !window.RTCPeerConnection) {
+      $('golive-status').textContent = 'This browser cannot use the camera here. Open the page on http://localhost in Chrome.';
+      return;
+    }
+    $('golive-status').textContent = 'Getting a stream key...';
+    const k = await api('POST', '/audit/v1/stream/key', { action: 'rotate', player_id: u.player_id, label: 'Web camera' });
+    if (k.status !== 200) return toast('Could not get a stream key.');
+    try {
+      camera = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 }, audio: true });
+    } catch {
+      $('golive-status').textContent = 'Camera blocked. Allow camera access in the browser.';
+      return;
+    }
+    $('golive-preview').srcObject = camera;
+    pc = new RTCPeerConnection();
+    camera.getTracks().forEach((t) => pc.addTransceiver(t, { direction: 'sendonly' }));
+    await pc.setLocalDescription(await pc.createOffer());
+    await new Promise((done) => {
+      if (pc.iceGatheringState === 'complete') return done();
+      pc.addEventListener('icegatheringstatechange', () => { if (pc && pc.iceGatheringState === 'complete') done(); });
+      setTimeout(done, 2000);
+    });
+    try {
+      const res = await fetch(mediaUrl(k.data.ingest_endpoints.webrtc), { method: 'POST', headers: { 'Content-Type': 'application/sdp' }, body: pc.localDescription.sdp });
+      if (!res.ok) throw new Error('media server answered ' + res.status);
+      await pc.setRemoteDescription({ type: 'answer', sdp: await res.text() });
+      $('golive-status').textContent = 'LIVE. Viewers of this match see your camera. Key ' + k.data.stream_key;
+      $('golive-start').disabled = true;
+      $('golive-stop').disabled = false;
+      if (kind === 'matches') {
+        setTimeout(async () => {
+          const r = await api('GET', '/api/v1/guest/matches/' + encodeURIComponent(entityId));
+          if (r.status === 200) play(r.data.playback_url);
+        }, 3000);
+      }
+    } catch (e) {
+      $('golive-status').textContent = 'Could not reach the media server (' + e.message + '). Is MediaMTX running (docker compose)?';
+      stopBroadcast(false);
+    }
+  }
+
+  async function stopBroadcast(revoke) {
+    if (pc) pc.close();
+    pc = null;
+    if (camera) camera.getTracks().forEach((t) => t.stop());
+    camera = null;
+    $('golive-preview').srcObject = null;
+    $('golive-start').disabled = false;
+    $('golive-stop').disabled = true;
+    const u = currentUser();
+    if (revoke && u && u.player_id) {
+      await api('POST', '/audit/v1/stream/key', { action: 'revoke', player_id: u.player_id });
+      $('golive-status').textContent = 'Stopped. The stream key was revoked.';
     }
   }
 
@@ -320,9 +478,19 @@
   });
   $('auth-form').addEventListener('submit', signIn);
   $('auth-cancel').addEventListener('click', closeModal);
+  $('qr-btn').addEventListener('click', openQr);
+  $('qr-close').addEventListener('click', closeModal);
+  $('signin-btn').addEventListener('click', () => openModal('account'));
+  $('signout-btn').addEventListener('click', () => signOut(false));
+  $('golive-btn').addEventListener('click', () => {
+    $('golive').hidden = !$('golive').hidden;
+    if (!$('golive').hidden) $('golive').scrollIntoView({ behavior: 'smooth' });
+  });
+  $('golive-start').addEventListener('click', startBroadcast);
+  $('golive-stop').addEventListener('click', () => stopBroadcast(true));
   $('auth-backdrop').addEventListener('click', closeModal);
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !$('auth-modal').hidden) closeModal();
+    if (e.key === 'Escape' && (!$('auth-modal').hidden || !$('qr-modal').hidden)) closeModal();
   });
 
   ensureGuest().then(refreshCart).catch(() => {});
