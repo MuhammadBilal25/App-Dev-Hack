@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "day2-dev",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["scenario2/backend/dev-server.js"],
+      "port": 8080
+    }
+  ]
+}

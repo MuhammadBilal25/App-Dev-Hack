@@ -8,6 +8,7 @@ RUN npm ci --omit=dev && npm cache clean --force
 
 COPY src ./src
 COPY scenario2/backend ./scenario2/backend
+COPY scenario2/web ./scenario2/web
 
 USER node
 EXPOSE 8080

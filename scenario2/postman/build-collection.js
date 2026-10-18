@@ -155,6 +155,20 @@ const collection = {
         req('Reset (restore player-alpha-1) -> 200', 'POST', '/audit/v1/reset', {}),
       ],
     },
+    {
+      name: '8. Guest Web Player API',
+      item: [
+        req('Reset -> 200', 'POST', '/audit/v1/reset', {}),
+        req('Open the player page -> 200', 'GET', '/web/matches/match-m1/live', null, 'Open {{baseUrl}}/q/m1-live in a browser to see the page.'),
+        req('New guest session -> 201', 'POST', '/api/v1/guest/session', null, 'Copy guest_token into the guestToken collection variable to use your own token.'),
+        req('Match for guests -> 200', 'GET', '/api/v1/guest/matches/match-m1'),
+        req('Stage pinned jersey -> 200', 'POST', '/api/v1/guest/cart', { variant_id: 'var-jersey-001-L', quantity: 1 }, 'Allowed for guests (local cart staging only).', GUEST),
+        req('Guest cart -> 200', 'GET', '/api/v1/guest/cart', null, '', GUEST),
+        req('Stage without a guest token -> 401 UNAUTHENTICATED', 'POST', '/api/v1/guest/cart', { variant_id: 'var-jersey-001-L' }),
+        req('Player profile -> 200', 'GET', '/api/v1/guest/players/player-alpha-1'),
+        req('Club profile -> 200', 'GET', '/api/v1/guest/clubs/club-alpha-1'),
+      ],
+    },
   ],
 };
 

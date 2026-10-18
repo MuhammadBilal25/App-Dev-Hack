@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0B1F4D">
+  <title>NaSCon Live</title>
+  <link rel="stylesheet" href="/web/assets/styles.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="top">
+    <span class="brand">NaSCon <strong>Live</strong></span>
+    <span id="status-chip" class="chip" role="status" aria-live="polite"></span>
+  </header>
+
+  <main id="main" tabindex="-1">
+    <h1 id="title" class="title">Loading…</h1>
+
+    <section class="player" aria-label="Video">
+      <video id="video" data-testid="guest-video-player" controls playsinline muted
+             aria-label="Live match video" poster="/web/assets/poster.svg"></video>
+      <div class="overlay" aria-hidden="false">
+        <div class="score" aria-label="Live score">
+          <span id="home-name" class="team"></span>
+          <span id="score" data-testid="live-score-banner" aria-live="polite">- -</span>
+          <span id="away-name" class="team"></span>
+        </div>
+      </div>
+      <p id="notice" class="notice" hidden></p>
+    </section>
+
+    <section class="card merch" data-testid="pinned-merch-card" aria-labelledby="merch-name">
+      <div>
+        <p class="eyebrow">Pinned merch</p>
+        <h2 id="merch-name">Club jersey</h2>
+        <p id="merch-price" class="price"></p>
+      </div>
+      <div class="merch-actions">
+        <button id="add-to-cart" class="btn primary" data-testid="add-to-guest-cart-btn" type="button">Add to cart</button>
+        <button id="checkout" class="btn" type="button">
+          Proceed to Checkout <span class="badge" aria-label="items in cart"><span id="cart-count" data-testid="guest-cart-count">0</span></span>
+        </button>
+      </div>
+    </section>
+
+    <section class="card chat" aria-labelledby="chat-title">
+      <h2 id="chat-title">Live chat</h2>
+      <ul id="chat-list" class="chat-list" data-testid="chat-message-list" aria-live="polite" tabindex="0" aria-label="Chat messages"></ul>
+      <form id="chat-form" class="chat-form" autocomplete="off">
+        <label for="chat-input" class="sr-only">Chat message</label>
+        <input id="chat-input" data-testid="chat-input-field" type="text" maxlength="500" placeholder="Say something…">
+        <button id="chat-send" class="btn primary" data-testid="chat-send-btn" type="submit">Send</button>
+      </form>
+    </section>
+
+    <p id="toast" class="toast" role="status" aria-live="polite" hidden></p>
+  </main>
+
+  <div id="auth-backdrop" class="backdrop" hidden></div>
+  <div id="auth-modal" class="modal" data-testid="progressive-auth-modal" role="dialog" aria-modal="true"
+       aria-labelledby="auth-title" aria-describedby="auth-desc" hidden>
+    <h2 id="auth-title">Sign in to continue</h2>
+    <p id="auth-desc">Chat and checkout need an account. Your cart is kept and moves to your account.</p>
+    <form id="auth-form">
+      <label for="auth-email">Email</label>
+      <input id="auth-email" type="email" autocomplete="username" required>
+      <label for="auth-password">Password</label>
+      <input id="auth-password" type="password" autocomplete="current-password" required>
+      <p id="auth-error" class="error" role="alert" hidden></p>
+      <div class="modal-actions">
+        <button class="btn primary" type="submit">Sign in</button>
+        <button id="auth-cancel" class="btn" type="button">Not now</button>
+      </div>
+    </form>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js" defer></script>
+  <script src="/web/assets/app.js" defer></script>
+</body>
+</html>

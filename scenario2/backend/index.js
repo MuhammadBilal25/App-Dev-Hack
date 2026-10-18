@@ -11,6 +11,7 @@ const { guestCartRouter } = require('./modules/guest-cart/routes/guestCart.route
 const { moderationRouter } = require('./modules/moderation/routes/moderation.routes');
 const { observabilityRouter } = require('./modules/observability/routes/observability.routes');
 const { realtimeRouter } = require('./modules/realtime/routes/realtime.routes');
+const { guestWebRouter } = require('./modules/guest-web/routes/guestWeb.routes');
 const ws = require('./modules/realtime/controllers/ws.controller');
 
 // Runs before every Day 1 and Day 2 route: guest tokens can never write (FR-4.3).
@@ -26,6 +27,7 @@ function mountRoutes(app) {
   app.use(moderationRouter());
   app.use(observabilityRouter());
   app.use(realtimeRouter());
+  app.use(guestWebRouter());
 }
 
 module.exports = { mountGuards, mountRoutes, resetDay2, attachRealtime: ws.attach };

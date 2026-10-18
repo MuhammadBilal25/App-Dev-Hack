@@ -1584,6 +1584,229 @@
           }
         }
       ]
+    },
+    {
+      "name": "8. Guest Web Player API",
+      "item": [
+        {
+          "name": "Reset -> 200",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit/v1/reset",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit",
+                "v1",
+                "reset"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Open the player page -> 200",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/web/matches/match-m1/live",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web",
+                "matches",
+                "match-m1",
+                "live"
+              ]
+            },
+            "description": "Open {{baseUrl}}/q/m1-live in a browser to see the page."
+          }
+        },
+        {
+          "name": "New guest session -> 201",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/guest/session",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "guest",
+                "session"
+              ]
+            },
+            "description": "Copy guest_token into the guestToken collection variable to use your own token."
+          }
+        },
+        {
+          "name": "Match for guests -> 200",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/guest/matches/match-m1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "guest",
+                "matches",
+                "match-m1"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Stage pinned jersey -> 200",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{guestToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/guest/cart",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "guest",
+                "cart"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"variant_id\": \"var-jersey-001-L\",\n  \"quantity\": 1\n}"
+            },
+            "description": "Allowed for guests (local cart staging only)."
+          }
+        },
+        {
+          "name": "Guest cart -> 200",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{guestToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/guest/cart",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "guest",
+                "cart"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Stage without a guest token -> 401 UNAUTHENTICATED",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/guest/cart",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "guest",
+                "cart"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"variant_id\": \"var-jersey-001-L\"\n}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Player profile -> 200",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/guest/players/player-alpha-1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "guest",
+                "players",
+                "player-alpha-1"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Club profile -> 200",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/guest/clubs/club-alpha-1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "guest",
+                "clubs",
+                "club-alpha-1"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
     }
   ]
 }

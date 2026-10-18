@@ -7,7 +7,7 @@ const { err } = require('../../../src/lib/errors');
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 // Write routes a guest IS allowed to call (local guest cart staging). Exact paths.
-const GUEST_ALLOWED = new Set([]);
+const GUEST_ALLOWED = new Set(['/api/v1/guest/cart']);
 
 function bearer(req) {
   const m = /^Bearer\s+(\S+)$/i.exec(req.headers.authorization || '');
