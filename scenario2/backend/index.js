@@ -13,6 +13,7 @@ const { observabilityRouter } = require('./modules/observability/routes/observab
 const { realtimeRouter } = require('./modules/realtime/routes/realtime.routes');
 const { guestWebRouter } = require('./modules/guest-web/routes/guestWeb.routes');
 const ws = require('./modules/realtime/controllers/ws.controller');
+const media = require('./modules/streaming/services/media.service');
 
 // Runs before every Day 1 and Day 2 route: guest tokens can never write (FR-4.3).
 function mountGuards(app) {
@@ -30,4 +31,4 @@ function mountRoutes(app) {
   app.use(guestWebRouter());
 }
 
-module.exports = { mountGuards, mountRoutes, resetDay2, attachRealtime: ws.attach };
+module.exports = { mountGuards, mountRoutes, resetDay2, attachRealtime: ws.attach, startMediaPolling: () => media.startPolling() };

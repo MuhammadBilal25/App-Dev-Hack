@@ -52,6 +52,17 @@ function productView(productId) {
 
 const clubName = (id) => (state.clubs.get(id) || {}).name || id;
 
+// The match plays the newest active stream key of a player from either club (keys are
+// broadcast under /live/{stream_key}); null until someone from the match goes live.
+function matchPlayback(m) {
+  const keys = [...state.day2.streaming.keys.values()].filter((k) => {
+    const p = state.players.get(k.player_id);
+    return k.status === 'active' && p && (p.club_id === m.home || p.club_id === m.away);
+  });
+  const latest = keys.sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+  return latest ? `${MEDIA_HLS_URL}/live/${latest.stream_key}/index.m3u8` : null;
+}
+
 // GET /api/v1/guest/matches/{match_id}
 function matchView(matchId) {
   const m = state.matches.get(matchId);
@@ -66,7 +77,7 @@ function matchView(matchId) {
       home: { team_id: m.home, name: clubName(m.home), score: p.home.score },
       away: { team_id: m.away, name: clubName(m.away), score: p.away.score },
       score_text: `${p.home.score} - ${p.away.score}`,
-      playback_url: `${MEDIA_HLS_URL}/live/${matchId}/index.m3u8`,
+      playback_url: matchPlayback(m),
       vod_url: status === 'completed' ? `${MEDIA_HLS_URL}/vod/${matchId}/index.m3u8` : null,
       chat_room_id: `chat-${matchId}`,
       pinned_product: productView(state.pinned.get(matchId) || DEFAULT_PINNED),

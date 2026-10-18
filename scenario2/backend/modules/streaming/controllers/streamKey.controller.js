@@ -2,6 +2,7 @@
 
 const { send } = require('../../../shared/send');
 const service = require('../services/streamKey.service');
+const media = require('../services/media.service');
 
 const streamKey = (req, res) => send(res, service.handleStreamKey(req.body));
 
@@ -13,4 +14,7 @@ const mediaAuth = (req, res) => {
   res.status(200).json({ allowed: true });
 };
 
-module.exports = { streamKey, mediaAuth };
+const recorded = async (req, res) => send(res, await media.recorded(req.body));
+const vods = (req, res) => send(res, media.listVods(req.query));
+
+module.exports = { streamKey, mediaAuth, recorded, vods };

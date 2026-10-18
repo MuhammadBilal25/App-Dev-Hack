@@ -6,6 +6,7 @@ const { err, validation } = require('../../../../../src/lib/errors');
 const { isObj, isStr } = require('../../../../../src/lib/validate');
 const { signDay2 } = require('../../../shared/signature');
 const { MEDIA_RTMP_URL, MEDIA_HLS_URL, MEDIA_WEBRTC_URL } = require('../../../config');
+const media = require('./media.service');
 
 const ACTIONS = ['generate', 'rotate', 'revoke'];
 
@@ -30,6 +31,7 @@ function revokeCurrent(playerId) {
   if (current && current.status === 'active') {
     current.status = 'revoked';
     current.revoked_at = new Date().toISOString();
+    media.kickPublisher(current.stream_key); // cut the live ingest (async, never blocks)
   }
   store().activeByPlayer.delete(playerId);
   return current || null;

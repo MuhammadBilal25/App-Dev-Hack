@@ -80,6 +80,31 @@ class ProfileScreen extends ConsumerWidget {
           child: Column(
             children: [
               Semantics(
+                identifier: 'profile_scan_qr',
+                button: true,
+                child: ListTile(
+                  minTileHeight: AppSize.rowMin,
+                  leading: const Icon(Icons.qr_code_scanner),
+                  title: const Text('Scan a QR code'),
+                  subtitle: const Text('Match, club, player or co-stream posters'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push('/scan'),
+                ),
+              ),
+              if (user.role == UserRole.player && user.playerId != null)
+                Semantics(
+                  identifier: 'profile_go_live',
+                  button: true,
+                  child: ListTile(
+                    minTileHeight: AppSize.rowMin,
+                    leading: const Icon(Icons.videocam_outlined),
+                    title: const Text('Go live'),
+                    subtitle: const Text('Stream key, broadcast and squad co-stream'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => context.push('/go-live'),
+                  ),
+                ),
+              Semantics(
                 identifier: 'profile_orders',
                 button: true,
                 child: ListTile(

@@ -35,6 +35,9 @@ test('guest session -> read match -> stage cart; guest writes stay blocked', asy
   assert.strictEqual(m.body.status, 'in_progress');
   assert.strictEqual(m.body.chat_room_id, 'chat-match-m1');
   assert.strictEqual(m.body.pinned_product.pinned_variant_id, 'var-jersey-001-L');
+  assert.strictEqual(m.body.playback_url, null, 'nobody from the match is live yet');
+  await call('POST', '/audit/v1/stream/key', { action: 'rotate', player_id: 'player-alpha-1', stream_key_override: 'sk_live_00000000000000aa' });
+  assert.strictEqual((await call('GET', '/api/v1/guest/matches/match-m1')).body.playback_url, 'http://localhost:8888/live/sk_live_00000000000000aa/index.m3u8');
   assert.strictEqual((await call('GET', '/api/v1/guest/matches/ghost')).body.error.code, 'MATCH_NOT_FOUND');
 
   const add = await call('POST', '/api/v1/guest/cart', { variant_id: 'var-jersey-001-L' }, g);

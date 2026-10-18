@@ -1,0 +1,48 @@
+# MediaMTX (self-hosted media server) for Day 2. Mounted into the mediamtx container.
+#   RTMP ingest   rtmp://localhost:1935/live/{stream_key}        (OBS / FFmpeg)
+#   WebRTC WHIP   http://localhost:8889/live/{stream_key}/whip   (in-app broadcast)
+#   HLS playback  http://localhost:8888/live/{stream_key}/index.m3u8
+#   WebRTC WHEP   http://localhost:8889/live/{stream_key}/whep
+logLevel: info
+
+# Control API (internal only): the backend uses it to kick revoked publishers and read bitrate.
+api: yes
+apiAddress: :9997
+
+# Every publish/read asks the backend; revoked keys get 409 KEY_REVOKED and are refused.
+authMethod: http
+authHTTPAddress: http://api:8080/internal/media/auth
+authHTTPExclude:
+  - action: api
+  - action: metrics
+  - action: pprof
+
+rtsp: no
+srt: no
+
+rtmp: yes
+rtmpAddress: :1935
+
+hls: yes
+hlsAddress: :8888
+hlsAllowOrigin: '*'
+hlsVariant: lowLatency
+hlsSegmentDuration: 1s
+hlsPartDuration: 200ms
+
+webrtc: yes
+webrtcAddress: :8889
+webrtcAllowOrigin: '*'
+webrtcLocalUDPAddress: :8189
+webrtcLocalTCPAddress: :8189
+
+pathDefaults:
+  # Automatic recording; each finished segment is uploaded to MinIO and indexed as VOD.
+  record: yes
+  recordPath: /recordings/%path/%Y-%m-%d_%H-%M-%S-%f
+  recordFormat: fmp4
+  recordSegmentDuration: 10s
+  runOnRecordSegmentComplete: wget -qO- --post-data "path=$MTX_PATH&segment=$MTX_SEGMENT_PATH" http://api:8080/internal/media/recorded
+
+paths:
+  all_others:

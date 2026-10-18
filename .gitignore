@@ -7,3 +7,9 @@ mobile/build/
 mobile/.dart_tool/
 *.pdf
 .idea/
+
+# Build outputs: never pushed (keeps pushes small)
+*.apk
+*.aab
+*.ipa
+scenario2/recordings/

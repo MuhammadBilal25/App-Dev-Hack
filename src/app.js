@@ -23,6 +23,7 @@ const { shopRouter } = require('./routes/shop');
 const { adminRouter } = require('./routes/admin');
 const merch = require('./services/merch');
 const day2 = require('../scenario2/backend');
+const day2Health = require('../scenario2/backend/shared/health');
 
 // Image uploads arrive as raw bytes; every other body is parsed as JSON.
 const isBinary = (req) => /^(image\/|application\/octet-stream)/i.test(req.headers['content-type'] || '');
@@ -35,7 +36,8 @@ function createApp() {
   app.disable('x-powered-by');
   app.set('trust proxy', false);
 
-  app.use(express.json({ limit: '1mb', type: (req) => !isBinary(req) }));
+  // Form bodies (MediaMTX recording callback) are parsed by their own route.
+  app.use(express.json({ limit: '1mb', type: (req) => !isBinary(req) && !/urlencoded/i.test(req.headers['content-type'] || '') }));
   day2.mountGuards(app);
 
   // Uploaded images, streamed from object storage. Public (product photos and logos) and outside
@@ -48,9 +50,12 @@ function createApp() {
   });
 
   app.get('/health', async (req, res) => {
-    const dbOk = await db.ping();
-    if (dbOk && state.ready) return res.status(200).json({ status: 'ok' });
-    return res.status(503).json({ status: 'starting', database: dbOk, seeded: !!state.ready });
+    const [dbOk, deps] = await Promise.all([db.ping(), day2Health.dependencies()]);
+    // null = not configured (local runs without Redis / media server).
+    const redisOk = deps.redis !== false;
+    const mediaOk = deps.media !== false;
+    if (dbOk && state.ready && redisOk && mediaOk) return res.status(200).json({ status: 'ok' });
+    return res.status(503).json({ status: 'starting', database: dbOk, redis: deps.redis, media_server: deps.media, seeded: !!state.ready });
   });
 
   app.post('/audit/v1/reset', async (req, res) => {

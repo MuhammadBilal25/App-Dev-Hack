@@ -13,6 +13,11 @@ import '../../features/manage/organizer_screens.dart';
 import '../../features/match/match_screen.dart';
 import '../../features/players/player_screen.dart';
 import '../../features/profile/profile_screen.dart';
+import '../../features/scenario2/costream_screen.dart';
+import '../../features/scenario2/deep_link.dart';
+import '../../features/scenario2/go_live_screen.dart';
+import '../../features/scenario2/live_match_screen.dart';
+import '../../features/scenario2/qr_scan_screen.dart';
 import '../../features/search/search_screen.dart';
 import '../../features/shell/app_shell.dart';
 import '../../features/splash/splash_screen.dart';
@@ -54,8 +59,13 @@ final routerProvider = Provider<GoRouter>((ref) {
     initialLocation: Routes.splash,
     refreshListenable: refresh,
     redirect: (context, state) {
-      final session = ref.read(authControllerProvider);
+      // Day 2 deep links (nascon://entity/{id}, nascon://stream/{id}) go straight to their screen.
+      final deep = state.uri.scheme == 'nascon' ? deepLinkTarget(state.uri) : null;
+      if (deep != null) return deep;
       final loc = state.matchedLocation;
+      // Guest screens: no login wall (FR-4.2), so a deep link never stops on the login screen.
+      if (loc.startsWith('/live/') || loc == '/scan') return null;
+      final session = ref.read(authControllerProvider);
       if (session.status == AuthStatus.unknown) return loc == Routes.splash ? null : Routes.splash;
       if (session.status == AuthStatus.signedOut) return loc == Routes.login ? null : Routes.login;
       if (loc == Routes.login || loc == Routes.splash) return Routes.home;
@@ -85,6 +95,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/club/:id/history', builder: (_, s) => RosterHistoryScreen(clubId: _id(s))),
       GoRoute(path: '/player/:id', builder: (_, s) => PlayerScreen(playerId: _id(s))),
       GoRoute(path: '/match/:id', builder: (_, s) => MatchScreen(matchId: _id(s))),
+      // Day 2: guest Match Live / Co-Stream, QR scanner, creator tools.
+      GoRoute(path: '/live/match/:id', builder: (_, s) => LiveMatchScreen(matchId: _id(s))),
+      GoRoute(path: '/live/costream/:id', builder: (_, s) => CostreamScreen(sessionId: _id(s))),
+      GoRoute(path: '/scan', builder: (_, _) => const QrScanScreen()),
+      GoRoute(path: '/go-live', builder: (_, _) => const GoLiveScreen()),
+      // nascon:// links whose host was dropped by the platform (/entity/{id}, /stream/{id}).
+      GoRoute(path: '/entity/:id', redirect: (_, s) => routeForEntity(_id(s)) ?? Routes.home),
+      GoRoute(path: '/stream/:id', redirect: (_, s) => routeForEntity(_id(s)) ?? Routes.home),
       GoRoute(path: '/product/:id', builder: (_, s) => ProductScreen(productId: _id(s))),
       GoRoute(path: '/cart', builder: (_, _) => const CartScreen()),
       GoRoute(path: '/checkout', builder: (_, _) => const CheckoutScreen()),
@@ -123,6 +141,8 @@ final routerProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(routes: [GoRoute(path: Routes.profile, builder: (_, _) => const ProfileScreen())]),
         ],
       ),
+      // nascon://entity/{id} delivered as just "/{id}".
+      GoRoute(path: '/:deepId', redirect: (_, s) => routeForEntity(_id(s, 'deepId')) ?? Routes.home),
     ],
   );
   ref.onDispose(router.dispose);

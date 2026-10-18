@@ -336,3 +336,20 @@ test('NFR-1: a score event reaches 25 WebSocket clients fast; SSE alias streams'
     await new Promise((r) => server.close(r));
   }
 });
+
+test('media recording callback (form body) indexes a VOD; traversal is refused', async () => {
+  const app = createApp().listen(0);
+  const base = `http://127.0.0.1:${app.address().port}`;
+  try {
+    const form = (body) => fetch(`${base}/internal/media/recorded`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body });
+    const ok = await form('path=live/sk_live_abc&segment=/recordings/live/sk_live_abc/2026-10-18_10-00-00-000000.mp4');
+    assert.strictEqual(ok.status, 201);
+    const entry = await ok.json();
+    assert.strictEqual(entry.key, 'vod/live/sk_live_abc/2026-10-18_10-00-00-000000.mp4');
+    assert.strictEqual((await form('path=live/x&segment=/recordings/../../etc/passwd')).status, 400);
+    const list = await (await fetch(`${base}/api/v1/vods?path=live/sk_live_abc`)).json();
+    assert.strictEqual(list.items.length, 1);
+  } finally {
+    app.close();
+  }
+});

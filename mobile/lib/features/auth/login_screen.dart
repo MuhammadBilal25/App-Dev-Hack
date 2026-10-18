@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/api/api_exception.dart';
 import '../../core/auth/auth_controller.dart';
@@ -164,6 +165,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             ),
                             const SizedBox(height: AppSpace.xl),
                             AppButton(id: 'login_submit', label: 'Sign in', loading: _loading, onPressed: _submit),
+                            const SizedBox(height: AppSpace.sm),
+                            AppButton(
+                              id: 'login_scan_qr',
+                              label: 'Scan a QR code (no account needed)',
+                              icon: Icons.qr_code_scanner,
+                              variant: AppButtonVariant.secondary,
+                              onPressed: _loading ? null : () => context.push('/scan'),
+                            ),
                             const SizedBox(height: AppSpace.md),
                             Wrap(
                               alignment: WrapAlignment.center,

@@ -17,6 +17,7 @@ async function main() {
   const server = http.createServer(app);
   server.keepAliveTimeout = 65000;
   day2.attachRealtime(server);
+  day2.startMediaPolling();
   // Listen first so /health can answer 503 while the database warms up.
   server.listen(PORT, '0.0.0.0', () => console.log(`API listening on :${PORT}`));
 

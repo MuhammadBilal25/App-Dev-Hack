@@ -46,6 +46,8 @@ dependencies:
   intl: ^0.20.3
   image_picker: ^1.2.4
   open_filex: ^5.0.0
+  video_player: 2.9.2
+  mobile_scanner: 6.0.2
 
 dev_dependencies:
   flutter_test:
