@@ -220,6 +220,7 @@
     lastFocus = document.activeElement;
     const u = currentUser();
     $('cart-role').textContent = u ? ({ viewer: 'Viewer', player: 'Player', club_manager: 'Club manager', league_organizer: 'Organizer', super_admin: 'Admin' }[u.role] || u.role) : '';
+    showStep('cart');
     $('cart-sheet').hidden = false;
     document.body.style.overflow = 'hidden';
     $('cart-back').focus();
@@ -304,6 +305,52 @@
     return row;
   }
 
+  function showStep(step) {
+    $('cart-view').hidden = step !== 'cart';
+    $('pay-view').hidden = step !== 'pay';
+    $('receipt-view').hidden = step !== 'receipt';
+    const order = ['cart', 'pay', 'receipt'];
+    order.forEach((s, i) => {
+      const li = $('step-' + s);
+      li.className = s === step ? 'on' : i < order.indexOf(step) ? 'done' : '';
+    });
+    $('cart-title').textContent = step === 'cart' ? 'Your cart' : step === 'pay' ? 'Checkout' : 'Receipt';
+    $('pay-error').hidden = true;
+  }
+
+  function summaryRow(left, right, bold) {
+    const d = el('div', bold ? 'grand' : '');
+    d.append(el('span', '', left), el('span', '', right));
+    return d;
+  }
+
+  function showPayment() {
+    if (!lastQuote || lastQuote.lines.length === 0) return;
+    const box = $('pay-summary');
+    box.textContent = '';
+    for (const l of lastQuote.lines) box.append(summaryRow(l.product_name + (l.size ? ' (' + l.size + ')' : '') + ' \u00d7 ' + l.quantity, pkr(l.line_total_minor)));
+    box.append(summaryRow('Subtotal', pkr(lastQuote.subtotal_minor)));
+    if (lastQuote.discount_minor > 0) box.append(summaryRow('Discount (' + lastQuote.discount_code + ')', '- ' + pkr(lastQuote.discount_minor)));
+    box.append(summaryRow('Total to pay', pkr(lastQuote.total_minor), true));
+    $('pay-amount').textContent = pkr(lastQuote.total_minor);
+    showStep('pay');
+    $('pay-now').focus();
+  }
+
+  let lastOrderId = null;
+  async function downloadReceipt() {
+    if (!lastOrderId) return;
+    const res = await fetch('/api/v1/orders/' + encodeURIComponent(lastOrderId) + '/receipt.pdf', { headers: { Authorization: 'Bearer ' + memberToken } });
+    if (!res.ok) return toast('Receipt is not ready yet.');
+    window.open(URL.createObjectURL(await res.blob()), '_blank');
+  }
+
+  const PAY_ERRORS = {
+    PAYMENT_DECLINED: 'Your card was declined. Nothing was charged. Try the Visa 4242 card.',
+    PAYMENT_CAPTURE_FAILED: 'The payment could not be completed. Nothing was charged. Try again.',
+    OUT_OF_STOCK: 'Sorry, that size just sold out. Go back to your cart and change it.',
+  };
+
   async function setQty(variantId, quantity) {
     await api('POST', '/api/v1/member-cart/set', { variant_id: variantId, quantity }, memberToken);
     await renderCart();
@@ -314,26 +361,33 @@
   async function payCart() {
     const cart = await refreshMemberCart();
     if (!cart || cart.items.length === 0) return;
-    $('cart-pay').disabled = true;
+    $('pay-now').disabled = true;
+    const card = (document.querySelector('input[name="card"]:checked') || {}).value || 'tok_success';
     const orderId = 'web-' + Date.now().toString(36);
     const r = await api('POST', '/api/v1/checkout', {
       order_id: orderId,
       items: cart.items.map((it) => ({ variant_id: it.variant_id, quantity: it.quantity })),
       discount_code: lastQuote && lastQuote.discount_valid ? discountCode : undefined,
-      payment: { token: 'tok_success' },
+      payment: { token: card },
     }, memberToken);
-    $('cart-pay').disabled = false;
+    $('pay-now').disabled = false;
     if (r.status === 201 || r.status === 200) {
       await api('POST', '/api/v1/member-cart/clear', {}, memberToken);
       $('cart-count').textContent = '0';
       discountCode = null;
       $('discount-code').value = '';
       $('discount-msg').textContent = '';
-      closeCart();
-      toast('Paid. Order ' + r.data.order_id + ' for PKR ' + (r.data.total_minor / 100).toFixed(2) + '. It is also in the app under My orders.');
+      lastOrderId = r.data.order_id;
+      $('receipt-order').textContent = 'Order ' + r.data.order_id + ' \u00b7 paid ' + pkr(r.data.total_minor);
+      const box = $('receipt-lines');
+      box.textContent = '';
+      for (const l of lastQuote.lines) box.append(summaryRow(l.product_name + (l.size ? ' (' + l.size + ')' : '') + ' \u00d7 ' + l.quantity, pkr(l.line_total_minor)));
+      box.append(summaryRow('Total paid', pkr(r.data.total_minor), true));
+      showStep('receipt');
     } else {
       const e = r.data && r.data.error;
-      toast(e && e.code === 'OUT_OF_STOCK' ? 'Sorry, that size just sold out.' : (e && e.message) || 'Payment failed.');
+      $('pay-error').textContent = (e && PAY_ERRORS[e.code]) || (e && e.message) || 'Payment failed. Nothing was charged.';
+      $('pay-error').hidden = false;
     }
   }
 
@@ -582,7 +636,11 @@
   $('auth-cancel').addEventListener('click', closeModal);
   $('qr-btn').addEventListener('click', openQr);
   $('cart-back').addEventListener('click', closeCart);
-  $('cart-pay').addEventListener('click', payCart);
+  $('cart-pay').addEventListener('click', showPayment);
+  $('pay-now').addEventListener('click', payCart);
+  $('pay-cancel').addEventListener('click', () => showStep('cart'));
+  $('receipt-done').addEventListener('click', () => { showStep('cart'); closeCart(); });
+  $('receipt-pdf').addEventListener('click', downloadReceipt);
   $('discount-form').addEventListener('submit', (e) => {
     e.preventDefault();
     discountCode = $('discount-code').value.trim().toUpperCase() || null;

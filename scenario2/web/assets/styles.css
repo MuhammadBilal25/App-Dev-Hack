@@ -100,3 +100,16 @@ label { display: block; margin: 12px 0 4px; color: var(--muted); }
 .btn.pay { width: 100%; justify-content: center; background: #c2410c; border-color: #c2410c; color: #fff; min-height: 52px; font-size: 16px; }
 .btn.pay:disabled { opacity: .5; }
 .center { text-align: center; }
+
+.steps { display: flex; gap: 6px; list-style: none; padding: 0; margin: 0 0 12px; }
+.steps li { flex: 1; text-align: center; padding: 6px 4px; border-radius: 999px; background: var(--surface); color: var(--muted); font-size: 13px; border: 1px solid var(--border); }
+.steps li.on { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 700; }
+.steps li.done { background: #16301d; color: #bfeccb; }
+.section { margin: 16px 0 8px; font-size: 15px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.cards { border: 1px solid var(--border); border-radius: 12px; padding: 0; margin: 8px 0 12px; overflow: hidden; }
+.card-opt { display: flex; gap: 12px; align-items: center; padding: 12px 16px; min-height: 56px; margin: 0; color: var(--text); cursor: pointer; border-bottom: 1px solid var(--border); }
+.card-opt:last-child { border-bottom: 0; }
+.card-opt input { width: 20px; height: 20px; min-height: 0; flex: none; }
+.card-opt small { color: var(--muted); }
+.btn.wide { width: 100%; justify-content: center; margin-top: 8px; }
+.done-mark { width: 64px; height: 64px; border-radius: 999px; background: #16301d; color: #bfeccb; font-size: 34px; display: flex; align-items: center; justify-content: center; margin: 16px auto 8px; }

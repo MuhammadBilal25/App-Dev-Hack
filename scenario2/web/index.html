@@ -99,6 +99,10 @@
       <h2 id="cart-title">Your cart</h2>
       <span id="cart-role" class="role-chip"></span>
     </div>
+    <ol class="steps" aria-label="Checkout steps">
+      <li id="step-cart" class="on">1 Cart</li><li id="step-pay">2 Payment</li><li id="step-receipt">3 Receipt</li>
+    </ol>
+    <div id="cart-view">
     <p class="synced">&#10003; Online &middot; all changes synced</p>
     <div id="cart-lines"></div>
     <p id="cart-empty" class="price" hidden>Your cart is empty. Add the pinned jersey from the match page.</p>
@@ -117,6 +121,34 @@
     </div>
     <button id="cart-pay" class="btn pay" type="button">&#128274; Checkout &middot; <span id="cart-pay-amount">PKR 0.00</span></button>
     <p class="price center">Prices and stock are checked again when you pay.</p>
+    </div>
+
+    <div id="pay-view" hidden>
+      <h3 class="section">Order summary</h3>
+      <div id="pay-summary" class="totals"></div>
+      <h3 class="section">Payment method</h3>
+      <p class="price">Test cards for the mock payment gateway. Never enter a real card.</p>
+      <fieldset class="cards">
+        <legend class="sr-only">Card</legend>
+        <label class="card-opt"><input type="radio" name="card" value="tok_success" checked><span><strong>Mock Visa &bull;&bull;&bull;&bull; 4242</strong><br><small>Approves and captures the payment</small></span></label>
+        <label class="card-opt"><input type="radio" name="card" value="tok_declined"><span><strong>Mock card &bull;&bull;&bull;&bull; 0002</strong><br><small>Declined by the bank (test a failed payment)</small></span></label>
+        <label class="card-opt"><input type="radio" name="card" value="tok_capture_fail"><span><strong>Mock card &bull;&bull;&bull;&bull; 0119</strong><br><small>Approved, then capture fails (test a failure)</small></span></label>
+      </fieldset>
+      <p id="pay-error" class="error" role="alert" hidden></p>
+      <button id="pay-now" class="btn pay" type="button">Pay <span id="pay-amount">PKR 0.00</span></button>
+      <button id="pay-cancel" class="btn wide" type="button">Cancel checkout</button>
+      <p class="price center">Cancelling returns you to your cart. Nothing is charged.</p>
+    </div>
+
+    <div id="receipt-view" hidden>
+      <div class="done-mark" aria-hidden="true">&#10003;</div>
+      <h3 class="center">Thank you for your order</h3>
+      <p id="receipt-order" class="price center"></p>
+      <div id="receipt-lines" class="totals"></div>
+      <button id="receipt-pdf" class="btn wide" type="button">Download receipt (PDF)</button>
+      <button id="receipt-done" class="btn pay" type="button">Done</button>
+      <p class="price center">This order is also in the NaSCon app under Profile &gt; My orders.</p>
+    </div>
   </div>
 
   <div id="qr-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="qr-title" hidden>
